@@ -1,0 +1,883 @@
+/* ==========================================================================
+   status.plugged.host — Tailwind CSS v4 source
+
+   Compiled locally to the committed assets/status.v3.css (no host build step):
+     export PATH="/root/.nvm/versions/node/v26.9.0/bin:$PATH"
+     cd /var/www/status && npm install && npm run build:css
+
+   The vhost CSP is style-src 'self' with no 'unsafe-inline', so nothing here
+   or in status.v3.js may emit an inline <style> or a style="" attribute. The
+   only dynamic values (meter widths) ride --p, which status.v3.js writes
+   through the CSSOM against the @property --p declaration below — CSP permits
+   scripted style mutation, only parsed inline style is blocked.
+
+   Hybrid strategy: the JS builds class strings at runtime (dot ${status},
+   bar ${status}, badge ${impact}, overall status-${state}, .meter[data-p] +
+   toggled .warn/.hot, …) that Tailwind's scanner cannot see. Every such rule
+   is hand-authored inside @layer base / @layer components (always emitted),
+   retokenized onto the unified theme tokens. Utilities are used for new,
+   static markup only.
+   ========================================================================== */
+
+@font-face {
+    font-family: 'Space Grotesk';
+    font-style: normal;
+    font-display: swap;
+    font-weight: 300 700;
+    src: url('/assets/fonts/space-grotesk-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Space Grotesk';
+    font-style: normal;
+    font-display: swap;
+    font-weight: 300 700;
+    src: url('/assets/fonts/space-grotesk-latin-ext.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-display: swap;
+    font-weight: 400 700;
+    src: url('/assets/fonts/jetbrains-mono-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-display: swap;
+    font-weight: 400 700;
+    src: url('/assets/fonts/jetbrains-mono-latin-ext.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* ==========================================================================
+   plugged.host — shared theme token layer. Unified onto the teal
+   --color-primary-* scale + a semantic --color-status-* set. No Nord ramp.
+   CSP-safe: no inline style; dynamic values still ride --p via the CSSOM.
+   ========================================================================== */
+
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@source "./index.html";
+@source "./assets/status.v3.js";
+
+/* Dynamic meter/progress fill. status.v3.js writes --p through the CSSOM. */
+@property --p {
+    syntax: '<number>';
+    initial-value: 0;
+    inherits: false;
+}
+
+@theme {
+    /* Pelican Theme v2 primary blue scale.
+       Matches /var/www/pelican/plugins/plugged-host-theme-v2/resources/css/theme.css */
+    --color-primary-50:  #eff6ff;
+    --color-primary-100: #dbeafe;
+    --color-primary-200: #93c5fd;
+    --color-primary-300: #60a5fa;
+    --color-primary-400: #3b82f6;
+    --color-primary-500: #2563eb;
+    --color-primary-600: #1d4ed8;
+    --color-primary-700: #1e40af;
+    --color-primary-800: #1e3a8a;
+    --color-primary-900: #172554;
+    --color-primary-950: #0d1330;
+
+    /* Theme v2 semantic status set — single source of truth for both sites + the canvas.
+       Status enum: operational | degraded | maintenance | partial_outage
+                    | major_outage | offline | unknown. */
+    --color-status-operational:    #22c55e;
+    --color-status-degraded:       #f59e0b;
+    --color-status-maintenance:    #3b82f6;
+    --color-status-partial_outage: #f97316;
+    --color-status-major_outage:   #ef4444;
+    --color-status-offline:        #ef4444;
+    --color-status-unknown:        #71717a;
+}
+
+/* ------------------------------------------------- runtime surface / ink --- */
+:root {
+    color-scheme: dark;
+
+    /* Pelican Theme v2 dark surfaces & palette by default */
+    --page: #0b0d10;
+    --page-deep: #101319;
+    --page-gradient: linear-gradient(to bottom, #101319, #0b0d10);
+    --card: rgba(255, 255, 255, 0.05);
+    --card-line: rgba(255, 255, 255, 0.06);
+    --raised: rgba(255, 255, 255, 0.1);
+    --sunken: rgba(15, 17, 22, 0.5);
+    --text: #ffffff;
+    --heading: #ffffff;
+    --muted: #9ca3af;
+    --faint: #71717a;
+    --line: rgba(255, 255, 255, 0.06);
+    --divide: rgba(255, 255, 255, 0.06);
+    --grid-line: rgba(255, 255, 255, 0.035);
+    --accent: #3b82f6;
+    --accent-soft: rgba(29, 78, 216, 0.12);
+    --track: rgba(255, 255, 255, 0.08);
+    --grad-a: #3b82f6;
+    --grad-b: #60a5fa;
+
+    --red-text: #f87171;
+    --orange-text: #fb923c;
+    --blue-text: #60a5fa;
+
+    /* Theme v2 Knobs */
+    --phv2-accent: #1d4ed8;
+    --phv2-accent-hover: #1e40af;
+    --phv2-accent-bright: #3b82f6;
+    --phv2-accent-glow: #60a5fa;
+    --phv2-bg-top: #101319;
+    --phv2-bg-bottom: #0b0d10;
+    --phv2-sidebar: #1c1e23;
+    --phv2-sunken: rgba(15, 17, 22, 0.5);
+    --phv2-dropdown: #181a1e;
+    --phv2-modal: #1a1c20;
+    --phv2-raise: rgba(255, 255, 255, 0.05);
+    --phv2-raise-2: rgba(255, 255, 255, 0.1);
+    --phv2-raise-3: rgba(255, 255, 255, 0.15);
+    --phv2-hairline: rgba(255, 255, 255, 0.05);
+    --phv2-text: #ffffff;
+    --phv2-text-nav: #d1d5db;
+    --phv2-text-muted: #9ca3af;
+    --phv2-text-faint: #71717a;
+
+    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.35);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+
+    --r-card: 1rem;
+    --r-badge: 0.5rem;
+    --r-sm: 0.5rem;
+    --r-pill: 9999px;
+
+    --focus: #3b82f6;
+    --ink-rgb: 59, 130, 246;
+    --grain: 0.025;
+}
+
+:root[data-theme="light"] {
+    color-scheme: light;
+
+    /* Light mode surface tokens */
+    --page: #f8fafc;
+    --page-deep: #f1f5f9;
+    --page-gradient: none;
+    --card: #ffffff;
+    --card-line: rgba(15, 23, 42, 0.08);
+    --raised: #ffffff;
+    --sunken: #f1f5f9;
+    --text: #0f172a;
+    --heading: #0f172a;
+    --muted: #64748b;
+    --faint: #94a3b8;
+    --line: #e2e8f0;
+    --divide: #e2e8f0;
+    --grid-line: rgba(15, 23, 42, 0.04);
+    --accent: #1d4ed8;
+    --accent-soft: rgba(29, 78, 216, 0.08);
+    --track: #e2e8f0;
+    --grad-a: #1d4ed8;
+    --grad-b: #3b82f6;
+
+    --red-text: #b91c1c;
+    --orange-text: #c2410c;
+    --blue-text: #1d4ed8;
+
+    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+
+    --focus: #1d4ed8;
+    --ink-rgb: 29, 78, 216;
+    --grain: 0.02;
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0b0d10;
+    --page-deep: #101319;
+    --page-gradient: linear-gradient(to bottom, #101319, #0b0d10);
+    --card: rgba(255, 255, 255, 0.05);
+    --card-line: rgba(255, 255, 255, 0.06);
+    --raised: rgba(255, 255, 255, 0.1);
+    --sunken: rgba(15, 17, 22, 0.5);
+    --text: #ffffff;
+    --heading: #ffffff;
+    --muted: #9ca3af;
+    --faint: #71717a;
+    --line: rgba(255, 255, 255, 0.06);
+    --divide: rgba(255, 255, 255, 0.06);
+    --grid-line: rgba(255, 255, 255, 0.035);
+    --accent: #3b82f6;
+    --accent-soft: rgba(29, 78, 216, 0.12);
+    --track: rgba(255, 255, 255, 0.08);
+    --grad-a: #3b82f6;
+    --grad-b: #60a5fa;
+    --red-text: #f87171;
+    --orange-text: #fb923c;
+    --blue-text: #60a5fa;
+    --phv2-accent: #1d4ed8;
+    --phv2-accent-hover: #1e40af;
+    --phv2-accent-bright: #3b82f6;
+    --phv2-accent-glow: #60a5fa;
+    --phv2-bg-top: #101319;
+    --phv2-bg-bottom: #0b0d10;
+    --phv2-sidebar: #1c1e23;
+    --phv2-sunken: rgba(15, 17, 22, 0.5);
+    --phv2-dropdown: #181a1e;
+    --phv2-modal: #1a1c20;
+    --phv2-raise: rgba(255, 255, 255, 0.05);
+    --phv2-raise-2: rgba(255, 255, 255, 0.1);
+    --phv2-raise-3: rgba(255, 255, 255, 0.15);
+    --phv2-hairline: rgba(255, 255, 255, 0.05);
+    --phv2-text: #ffffff;
+    --phv2-text-nav: #d1d5db;
+    --phv2-text-muted: #9ca3af;
+    --phv2-text-faint: #71717a;
+    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.35);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+    --focus: #3b82f6;
+    --ink-rgb: 59, 130, 246;
+    --grain: 0.025;
+}
+
+/* Expose the runtime surface tokens as Tailwind color utilities so bg-card,
+   text-muted, border-line, etc. follow the light/dark swap automatically. */
+@theme inline {
+    --color-page: var(--page);
+    --color-page-deep: var(--page-deep);
+    --color-card: var(--card);
+    --color-raised: var(--raised);
+    --color-text: var(--text);
+    --color-heading: var(--heading);
+    --color-muted: var(--muted);
+    --color-faint: var(--faint);
+    --color-line: var(--line);
+    --color-divide: var(--divide);
+    --color-accent: var(--accent);
+    --color-track: var(--track);
+}
+
+/* ==========================================================================
+   BASE — element defaults + resets. Always emitted.
+   ========================================================================== */
+@layer base {
+    * { box-sizing: border-box; }
+
+    html { -webkit-text-size-adjust: 100%; }
+
+    body {
+        margin: 0;
+        min-width: 320px;
+        background-color: var(--page);
+        background-image: var(--page-gradient, none);
+        background-attachment: fixed;
+        color: var(--text);
+        /* Pelican Theme v2: Space Grotesk everywhere */
+        font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+        font-size: 1rem;
+        font-weight: 400;
+        line-height: 1.55;
+        font-optical-sizing: auto;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    a { color: inherit; }
+    img, svg { max-width: 100%; }
+    button { font: inherit; color: inherit; }
+    :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--r-sm); }
+
+    h1, h2, h3 {
+        margin: 0;
+        color: var(--heading);
+        font-weight: 700;
+        line-height: 1.15;
+        letter-spacing: -.025em;
+        text-wrap: balance;
+    }
+}
+
+/* ==========================================================================
+   COMPONENTS — hand-authored UI. Always emitted (never tree-shaken), so the
+   runtime-built class strings survive. Retokenized onto the unified tokens.
+   ========================================================================== */
+@layer components {
+    .shell { width: min(1100px, calc(100% - 2.5rem)); margin-inline: auto; }
+    .num { font-variant-numeric: tabular-nums; }
+
+    .skip {
+        position: fixed;
+        top: -6rem;
+        left: 1rem;
+        z-index: 99;
+        padding: .625rem 1rem;
+        border: 1px solid var(--line);
+        border-radius: var(--r-pill);
+        background: var(--card);
+        box-shadow: var(--shadow-md);
+        text-decoration: none;
+        font-size: .875rem;
+        font-weight: 600;
+        transition: top .2s ease;
+    }
+    .skip:focus { top: 1rem; }
+
+    /* Same masked grid as the marketing page, so the two sites read as one family. */
+    .bg-grid {
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+        contain: strict;
+        background-image:
+            linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+            linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+        background-size: 72px 72px;
+        background-position: center top;
+        -webkit-mask-image: radial-gradient(ellipse 120% 70% at 50% 0%, #000 5%, transparent 70%);
+        mask-image: radial-gradient(ellipse 120% 70% at 50% 0%, #000 5%, transparent 70%);
+    }
+
+    /* -------------------------------------------------------- shared card --- */
+    /* Theme v2 translucent card surfaces: white/5 raise with hairline border. */
+    .overall,
+    .component-list,
+    .metric,
+    .node,
+    .uptime-row,
+    .incident {
+        border: 1px solid var(--card-line);
+        border-radius: var(--r-card);
+        background: var(--card);
+        box-shadow: var(--shadow-md);
+    }
+
+    [data-theme="dark"] .overall,
+    [data-theme="dark"] .component-list,
+    [data-theme="dark"] .metric,
+    [data-theme="dark"] .node,
+    [data-theme="dark"] .uptime-row,
+    [data-theme="dark"] .incident {
+        border: 1px solid var(--card-line);
+        background: var(--card);
+        box-shadow: none;
+    }
+
+    [data-theme="dark"] .overall:hover,
+    [data-theme="dark"] .component-list:hover,
+    [data-theme="dark"] .metric:hover,
+    [data-theme="dark"] .node:hover,
+    [data-theme="dark"] .uptime-row:hover,
+    [data-theme="dark"] .incident:hover {
+        border-color: rgba(255, 255, 255, 0.12);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.35);
+    }
+
+    /* ---------------------------------------------------------- topbar ----- */
+    .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        border-bottom: 1px solid var(--divide);
+        background: var(--page);
+        transition: border-color .25s ease, background .25s ease;
+    }
+    [data-theme="dark"] .topbar {
+        background: rgba(16, 19, 25, 0.88);
+        backdrop-filter: blur(12px);
+        border-bottom-color: rgba(255, 255, 255, 0.06);
+    }
+    .nav {
+        min-height: 68px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+    .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: .625rem;
+        color: var(--heading);
+        text-decoration: none;
+        font-size: 1rem;
+        font-weight: 700;
+        letter-spacing: -.02em;
+    }
+    .brand img {
+        width: 32px; height: 32px;
+        border-radius: var(--r-sm);
+        object-fit: cover;
+    }
+    .brand em { color: var(--color-primary-500); font-style: normal; }
+    .brand .sep { color: var(--faint); font-weight: 400; }
+
+    .nav-actions { display: flex; align-items: center; gap: .125rem; }
+
+    .nav-actions > a {
+        padding: .4375rem .6875rem;
+        border-radius: var(--r-sm);
+        color: var(--muted);
+        text-decoration: none;
+        font-size: .875rem;
+        font-weight: 500;
+        transition: color .18s ease, background .18s ease;
+    }
+    .nav-actions > a:hover { color: var(--heading); background: var(--line); }
+    [data-theme="dark"] .nav-actions > a:hover { color: var(--heading); background: rgba(255, 255, 255, .05); }
+
+    .theme {
+        width: 36px; height: 36px;
+        margin-inline: .375rem;
+        display: grid;
+        place-items: center;
+        border: 0;
+        border-radius: var(--r-sm);
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+        transition: color .18s ease, background .18s ease;
+    }
+    .theme:hover { color: var(--heading); background: var(--line); }
+    [data-theme="dark"] .theme:hover { background: rgba(255, 255, 255, .05); }
+    .theme svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; }
+    .icon-sun { display: none; }
+    [data-theme="dark"] .icon-sun { display: block; }
+    [data-theme="dark"] .icon-moon { display: none; }
+
+    /* Primary button — Pelican Theme v2 signature blue pill */
+    .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: .5rem;
+        min-height: 2.25rem;
+        padding: .375rem 1.125rem;
+        border: 1px solid transparent;
+        border-radius: var(--r-pill);
+        background: var(--phv2-accent, #1d4ed8);
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.15);
+        color: #ffffff;
+        text-decoration: none;
+        font-size: .8125rem;
+        font-weight: 500;
+        transition: background .15s ease, box-shadow .15s ease, transform .1s ease;
+    }
+    .button:hover { background: var(--phv2-accent-hover, #1e40af); box-shadow: 0 4px 12px 0 rgba(29, 78, 216, 0.35); transform: translateY(-1px); }
+    .button:active { transform: scale(0.97); box-shadow: none; }
+
+    /* -------------------------------------------------------- page head ---- */
+    main { padding: clamp(2rem, 5vw, 3.5rem) 0 clamp(3.5rem, 8vw, 6rem); }
+
+    .page-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 2rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+        margin: 0 0 .75rem;
+        padding: .3rem .7rem;
+        border: 1px solid var(--line);
+        border-radius: var(--r-badge);
+        background: var(--card);
+        box-shadow: var(--shadow-xs);
+        color: var(--muted);
+        font-size: .75rem;
+        font-weight: 500;
+    }
+    .page-head h1 { font-size: clamp(1.875rem, 4vw, 2.75rem); }
+    .updated { color: var(--faint); font-size: .8125rem; text-align: right; }
+    .updated time {
+        display: block;
+        margin-top: .125rem;
+        color: var(--heading);
+        font-size: .875rem;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* ----------------------------------------------------------- overall --- */
+    /* Pelican Theme v2 signature callout styling */
+    .overall {
+        display: flex;
+        align-items: center;
+        gap: .875rem;
+        padding: 1.125rem 1.25rem;
+        margin-bottom: clamp(2rem, 4vw, 3rem);
+        border: 1px solid var(--card-line);
+        border-left: 4px solid var(--color-status-unknown);
+        border-radius: 0.75rem;
+        background: var(--card);
+        transition: background .2s ease, border-color .2s ease;
+    }
+    .status-mark {
+        position: relative;
+        flex: 0 0 auto;
+        width: 9px; height: 9px;
+        border-radius: 50%;
+        background: var(--color-status-unknown);
+        color: var(--color-status-unknown);
+    }
+    .status-mark::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: currentColor;
+        animation: ping 2.4s cubic-bezier(0, 0, .2, 1) infinite;
+    }
+    @keyframes ping { to { transform: scale(3); opacity: 0; } }
+
+    .overall-body { flex: 1 1 auto; min-width: 0; }
+    .overall strong { display: block; color: var(--heading); font-size: 1rem; font-weight: 600; }
+    .overall span { color: var(--muted); font-size: .875rem; }
+
+    /* Active-incident affordance on the banner. */
+    .overall-flag {
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        gap: .375rem;
+        padding: .3125rem .625rem;
+        border-radius: var(--r-badge);
+        background: var(--accent-soft);
+        color: var(--accent);
+        text-decoration: none;
+        font-size: .75rem;
+        font-weight: 600;
+        white-space: nowrap;
+        transition: background .18s ease;
+    }
+    .overall-flag:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+    .overall-flag i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+    /* Theme v2 callout tints and status mark mapping */
+    .overall.status-operational {
+        border-left-color: var(--color-status-operational);
+        background: color-mix(in srgb, var(--color-status-operational) 7%, var(--card));
+    }
+    .overall.status-degraded {
+        border-left-color: var(--color-status-degraded);
+        background: color-mix(in srgb, var(--color-status-degraded) 7%, var(--card));
+    }
+    .overall.status-maintenance {
+        border-left-color: var(--color-status-maintenance);
+        background: color-mix(in srgb, var(--color-status-maintenance) 7%, var(--card));
+    }
+    .overall.status-partial_outage {
+        border-left-color: var(--color-status-partial_outage);
+        background: color-mix(in srgb, var(--color-status-partial_outage) 7%, var(--card));
+    }
+    .overall.status-major_outage,
+    .overall.status-offline {
+        border-left-color: var(--color-status-major_outage);
+        background: color-mix(in srgb, var(--color-status-major_outage) 7%, var(--card));
+    }
+
+    /* Status colour map — single source of truth for marks, dots, bars. */
+    .status-operational .status-mark,    .dot.operational,    .bar.operational    { background: var(--color-status-operational);    color: var(--color-status-operational); }
+    .status-degraded .status-mark,        .dot.degraded,       .bar.degraded       { background: var(--color-status-degraded);        color: var(--color-status-degraded); }
+    .status-maintenance .status-mark,     .dot.maintenance,    .bar.maintenance    { background: var(--color-status-maintenance);     color: var(--color-status-maintenance); }
+    .status-partial_outage .status-mark,  .dot.partial_outage, .bar.partial_outage { background: var(--color-status-partial_outage);  color: var(--color-status-partial_outage); }
+    .status-major_outage .status-mark,    .dot.major_outage,   .bar.major_outage   { background: var(--color-status-major_outage);    color: var(--color-status-major_outage); }
+    .status-offline .status-mark,         .dot.offline,        .bar.offline        { background: var(--color-status-offline);         color: var(--color-status-offline); }
+    .status-unknown .status-mark,         .dot.unknown                             { background: var(--color-status-unknown);         color: var(--color-status-unknown); }
+
+    /* ---------------------------------------------------------- sections --- */
+    .section { margin-top: clamp(2.25rem, 5vw, 3.25rem); }
+    .section-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+    .section h2 { font-size: 1.25rem; }
+    .section-copy { margin: .25rem 0 0; color: var(--muted); font-size: .875rem; }
+    .section-head > a {
+        flex: none;
+        padding: .3rem .6875rem;
+        border-radius: var(--r-sm);
+        color: var(--accent);
+        text-decoration: none;
+        font-size: .8125rem;
+        font-weight: 500;
+        transition: background .18s ease;
+    }
+    .section-head > a:hover { background: var(--page-deep); }
+    [data-theme="dark"] .section-head > a:hover { background: rgba(255, 255, 255, .05); }
+    .reporting { flex: none; color: var(--faint); font-size: .8125rem; font-variant-numeric: tabular-nums; }
+
+    /* -------------------------------------------------------- components --- */
+    .component-list { overflow: hidden; }
+    .component {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: .9375rem 1.25rem;
+        border-top: 1px solid var(--divide);
+    }
+    .component:first-child { border-top: 0; }
+    .component-main { min-width: 0; }
+    .component-name {
+        display: flex;
+        align-items: center;
+        gap: .625rem;
+        color: var(--heading);
+        font-size: .9375rem;
+        font-weight: 600;
+    }
+    .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--color-status-unknown); }
+    .component-note { margin: .25rem 0 0; padding-left: 1.25rem; color: var(--muted); font-size: .8125rem; }
+    .component-side { flex: none; display: flex; align-items: center; gap: .625rem; }
+    .component-state { color: var(--muted); font-size: .8125rem; }
+
+    /* Small inline "affected" chip on a component/node row with an active incident. */
+    .flag {
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        gap: .3125rem;
+        padding: .125rem .5rem;
+        border-radius: var(--r-badge);
+        background: color-mix(in srgb, var(--color-status-degraded) 18%, transparent);
+        color: var(--orange-text);
+        font-size: .6875rem;
+        font-weight: 600;
+        text-decoration: none;
+    }
+    .flag i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+    .flag.impact-major, .flag.impact-critical { background: color-mix(in srgb, var(--color-status-major_outage) 18%, transparent); color: var(--red-text); }
+    .flag.impact-minor, .flag.impact-partial_outage { background: color-mix(in srgb, var(--color-status-partial_outage) 18%, transparent); color: var(--orange-text); }
+    .flag.impact-maintenance { background: color-mix(in srgb, var(--color-status-maintenance) 18%, transparent); color: var(--blue-text); }
+
+    /* ----------------------------------------------------------- metrics --- */
+    .resource-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .metric { position: relative; overflow: hidden; padding: 1.125rem 1.25rem; }
+    .metric-label {
+        display: block;
+        color: var(--phv2-text-muted);
+        font-size: .75rem;
+        font-weight: 600;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+    }
+    .metric-value {
+        display: block;
+        margin: .25rem 0 .75rem;
+        color: var(--heading);
+        font-size: 1.25rem;
+        font-weight: 700;
+        letter-spacing: -.025em;
+        font-variant-numeric: tabular-nums;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .meter { height: 6px; border-radius: var(--r-pill); background: var(--track); overflow: hidden; }
+    /* status.v3.js sets --p through the CSSOM; style-src 'self' forbids the
+       style="width:…" this used to emit, which left every bar at zero. */
+    .meter > i {
+        display: block;
+        height: 100%;
+        width: calc(var(--p, 0) * 1%);
+        border-radius: inherit;
+        background: var(--phv2-accent-bright, #3b82f6);
+        transition: width .8s cubic-bezier(.16, 1, .3, 1), background .3s ease;
+    }
+    .meter.warn > i { background: var(--color-status-degraded); }
+    .meter.hot > i { background: var(--color-status-major_outage); }
+
+    .metric small { display: block; margin-top: .5rem; color: var(--faint); font-size: .75rem; font-variant-numeric: tabular-nums; }
+
+    .spark { display: block; width: 100%; height: 52px; margin-top: .5rem; }
+    .spark polyline { fill: none; stroke: var(--phv2-accent-bright, #3b82f6); stroke-width: 1.75; vector-effect: non-scaling-stroke; }
+    .spark .area { fill: var(--accent-soft); stroke: none; }
+
+    /* ------------------------------------------------------------- nodes --- */
+    .nodes { display: grid; gap: 1rem; }
+    .node { overflow: hidden; }
+    .node-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: .9375rem 1.25rem;
+        border-bottom: 1px solid var(--divide);
+    }
+    .node-head-main { min-width: 0; }
+    .node-title {
+        display: flex;
+        align-items: center;
+        gap: .625rem;
+        color: var(--heading);
+        font-size: .9375rem;
+        font-weight: 600;
+    }
+    .node-meta { display: block; margin-top: .125rem; color: var(--faint); font-size: .75rem; }
+    .node-side { flex: none; display: flex; align-items: center; gap: .625rem; }
+    .node .resource-grid { padding: 1rem; }
+
+    /* Nested panels, not nested cards: sunken fill with hairline border. */
+    .node .metric {
+        border-color: var(--phv2-hairline);
+        border-radius: 0.75rem;
+        background: var(--page-deep);
+        box-shadow: none;
+    }
+    [data-theme="dark"] .node .metric {
+        border-color: var(--phv2-hairline);
+        background: var(--phv2-sunken, rgba(15, 17, 22, 0.5));
+    }
+
+    /* Per-node stat strip (latency, uptime, streak). */
+    .node-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .5rem .5rem;
+        padding: 0 1rem 1rem;
+    }
+    .node .node-stats { padding: 0 1rem 1rem; }
+    .stat {
+        display: inline-flex;
+        align-items: baseline;
+        gap: .375rem;
+        padding: .3125rem .625rem;
+        border: 1px solid var(--divide);
+        border-radius: 0.5rem;
+        background: var(--page-deep);
+        font-size: .75rem;
+    }
+    [data-theme="dark"] .stat {
+        background: var(--phv2-sunken, rgba(15, 17, 22, 0.5));
+        border-color: var(--phv2-hairline);
+    }
+    .stat b { color: var(--phv2-accent-bright, #3b82f6); font-weight: 600; font-variant-numeric: tabular-nums; font-family: 'JetBrains Mono', monospace; }
+    .stat span { color: var(--phv2-text-muted); }
+
+    /* ------------------------------------------------------------ uptime --- */
+    .uptime-list { display: grid; gap: 1rem; }
+    .uptime-row { padding: 1rem 1.25rem; }
+    .uptime-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 1rem;
+        margin-bottom: .625rem;
+    }
+    .uptime-title span:first-child { color: var(--heading); font-size: .9375rem; font-weight: 600; }
+    .uptime-windows { display: flex; gap: .375rem; flex-wrap: wrap; }
+    .uptime-windows .stat { padding: .1875rem .5rem; }
+    .bars { display: grid; grid-template-columns: repeat(90, 1fr); gap: 2px; height: 28px; }
+    .bar { border-radius: 2px; background: var(--color-status-operational); }
+    /* Days before monitoring started read as an empty track, not as uptime. */
+    .bar.unknown { background: var(--track); }
+    .uptime-foot { margin: .5rem 0 0; color: var(--faint); font-size: .75rem; }
+
+    /* --------------------------------------------------------- incidents --- */
+    .incidents { display: grid; gap: 1rem; }
+    .incident { padding: 1.125rem 1.25rem; }
+    .incident.is-active {
+        border-left: 4px solid var(--phv2-accent-bright);
+        background: color-mix(in srgb, var(--phv2-accent-tint) 50%, var(--card));
+    }
+    .incident-head { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
+    .incident h3 { font-size: 1rem; font-weight: 600; letter-spacing: -.015em; }
+    .incident-time { display: block; margin-top: .125rem; color: var(--faint); font-size: .75rem; }
+    .incident-badges { flex: none; display: flex; align-items: center; gap: .375rem; }
+    .incident-components { margin: .75rem 0 0; color: var(--muted); font-size: .8125rem; }
+
+    /* .fi-badge: rounded-lg, text-xs, semibold. */
+    .badge {
+        flex: none;
+        padding: .25rem .5rem;
+        border-radius: 0.5rem;
+        background: var(--page-deep);
+        color: var(--muted);
+        font-size: .6875rem;
+        font-weight: 600;
+        text-transform: capitalize;
+    }
+    [data-theme="dark"] .badge { background: var(--phv2-raise-2, rgba(255, 255, 255, 0.1)); color: #f3f4f6; }
+    .badge.major, .badge.critical { color: var(--red-text); }
+    .badge.minor { color: var(--orange-text); }
+    .badge.maintenance { color: var(--blue-text); }
+    .badge.live { background: var(--phv2-accent, #1d4ed8); color: #ffffff; border-radius: 9999px; text-transform: none; }
+
+    .updates { margin: 1rem 0 0; padding: 0; list-style: none; border-left: 2px solid var(--divide); }
+    .updates li { padding: 0 0 1rem 1rem; }
+    .updates li:last-child { padding-bottom: 0; }
+    .updates strong { display: block; color: var(--heading); font-size: .8125rem; font-weight: 600; }
+    .updates p { margin: .25rem 0 0; color: var(--muted); font-size: .875rem; }
+
+    .empty {
+        padding: 2rem;
+        border: 1px dashed var(--line);
+        border-radius: var(--r-card);
+        color: var(--faint);
+        text-align: center;
+        font-size: .875rem;
+    }
+
+    /* ------------------------------------------------------------ footer --- */
+    .footer {
+        margin-top: clamp(2.5rem, 6vw, 4rem);
+        padding: clamp(1.75rem, 4vw, 2.5rem) 0;
+        border-top: 1px solid var(--divide);
+        color: var(--muted);
+        font-size: .8125rem;
+    }
+    .footer .shell { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+    .footer-links { display: flex; flex-wrap: wrap; gap: 1rem; }
+    .footer a { text-decoration: none; transition: color .18s ease; }
+    .footer a:hover { color: var(--heading); }
+
+    /* -------------------------------------------------------- responsive --- */
+    @media (max-width: 860px) {
+        .resource-grid { grid-template-columns: 1fr; }
+        .node .resource-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 760px) {
+        .page-head { display: block; }
+        .updated { text-align: left; margin-top: 1rem; }
+        .section-head { flex-wrap: wrap; }
+        .bars { gap: 1px; height: 24px; }
+        .nav-actions > a { display: none; }
+    }
+
+    @media (max-width: 520px) {
+        .shell { width: min(100% - 1.5rem, 1100px); }
+        .nav { min-height: 60px; }
+        .overall { align-items: flex-start; flex-wrap: wrap; }
+        .component { align-items: flex-start; }
+        .component-state { text-align: right; }
+        .bars { grid-template-columns: repeat(45, 1fr); height: 20px; }
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: .001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .001ms !important;
+    }
+}

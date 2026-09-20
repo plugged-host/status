@@ -1,0 +1,3 @@
+/feed.xml    /data/feed.xml    200
+/rss         /data/feed.xml    301
+/data/*      https://panel.plugged.host/data/:splat    200!
