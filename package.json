@@ -2,7 +2,7 @@
   "name": "plugged-host-status",
   "version": "3.0.0",
   "private": true,
-  "description": "status.plugged.host — Netlify static status page. Tailwind CSS v4 compiled locally to a committed stylesheet (no host build step).",
+  "description": "status.plugged.host — Cloudflare Pages static status page (/data proxy in functions/). Tailwind CSS v4 compiled locally to a committed stylesheet (no host build step).",
   "scripts": {
     "build:css": "tailwindcss -i ./assets/status.src.css -o ./assets/status.v4.css --minify",
     "watch:css": "tailwindcss -i ./assets/status.src.css -o ./assets/status.v4.css --watch"

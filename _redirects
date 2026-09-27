@@ -1,3 +1,3 @@
-/feed.xml    /data/feed.xml    200
-/rss         /data/feed.xml    301
-/data/*      https://panel.plugged.host/data/:splat    200!
+# Cloudflare Pages redirects. /data/* and /feed.xml are proxied to the panel by
+# Pages Functions (functions/) — _redirects cannot proxy to another host.
+/rss  /feed.xml  301
