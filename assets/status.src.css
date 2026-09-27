@@ -1,13 +1,13 @@
 /* ==========================================================================
    status.plugged.host — Tailwind CSS v4 source
 
-   Compiled locally to the committed assets/status.v3.css (no host build step):
+   Compiled locally to the committed assets/status.v4.css (no host build step):
      export PATH="/root/.nvm/versions/node/v26.9.0/bin:$PATH"
      cd /var/www/status && npm install && npm run build:css
 
    The vhost CSP is style-src 'self' with no 'unsafe-inline', so nothing here
-   or in status.v3.js may emit an inline <style> or a style="" attribute. The
-   only dynamic values (meter widths) ride --p, which status.v3.js writes
+   or in status.v4.js may emit an inline <style> or a style="" attribute. The
+   only dynamic values (meter widths) ride --p, which status.v4.js writes
    through the CSSOM against the @property --p declaration below — CSP permits
    scripted style mutation, only parsed inline style is blocked.
 
@@ -66,9 +66,9 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 @source "./index.html";
-@source "./assets/status.v3.js";
+@source "./assets/status.v4.js";
 
-/* Dynamic meter/progress fill. status.v3.js writes --p through the CSSOM. */
+/* Dynamic meter/progress fill. status.v4.js writes --p through the CSSOM. */
 @property --p {
     syntax: '<number>';
     initial-value: 0;
@@ -693,7 +693,7 @@
     }
 
     .meter { height: 6px; border-radius: var(--r-pill); background: var(--track); overflow: hidden; }
-    /* status.v3.js sets --p through the CSSOM; style-src 'self' forbids the
+    /* status.v4.js sets --p through the CSSOM; style-src 'self' forbids the
        style="width:…" this used to emit, which left every bar at zero. */
     .meter > i {
         display: block;
@@ -708,9 +708,56 @@
 
     .metric small { display: block; margin-top: .5rem; color: var(--faint); font-size: .75rem; font-variant-numeric: tabular-nums; }
 
-    .spark { display: block; width: 100%; height: 52px; margin-top: .5rem; }
+    /* Sparkline + hover layer. The crosshair and point marker are HTML over the
+       stretched SVG (a circle inside preserveAspectRatio="none" would squash);
+       status.v4.js writes --x/--y (percent) through the CSSOM. */
+    .spark-wrap { position: relative; margin-top: .5rem; border-radius: 4px; cursor: crosshair; touch-action: pan-y; }
+    .spark-wrap:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+    .spark { display: block; width: 100%; height: 52px; }
     .spark polyline { fill: none; stroke: var(--phv2-accent-bright, #3b82f6); stroke-width: 1.75; vector-effect: non-scaling-stroke; }
     .spark .area { fill: var(--accent-soft); stroke: none; }
+    .spark-x,
+    .spark-dot { display: none; position: absolute; pointer-events: none; }
+    .spark-x { top: 0; bottom: 0; left: calc(var(--x, 0) * 1%); width: 1px; background: var(--faint); }
+    .spark-dot {
+        left: calc(var(--x, 0) * 1%);
+        top: calc(var(--y, 0) * 1%);
+        width: 10px;
+        height: 10px;
+        margin: -5px 0 0 -5px;
+        border: 2px solid var(--page);
+        border-radius: 50%;
+        background: var(--phv2-accent-bright, #3b82f6);
+    }
+    .spark-wrap.is-active .spark-x,
+    .spark-wrap.is-active .spark-dot { display: block; }
+
+    /* Floating readout — dropdown elevation, the one popover surface the theme has. */
+    .spark-tip {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 30;
+        padding: .375rem .625rem;
+        border: 1px solid var(--card-line);
+        border-radius: var(--r-sm);
+        background: var(--phv2-dropdown, #181a1e);
+        box-shadow: var(--shadow-lg);
+        pointer-events: none;
+        white-space: nowrap;
+        transform: translate(calc(var(--tx, 0) * 1px - 50%), calc(var(--ty, 0) * 1px - 100% - 12px));
+    }
+    .spark-tip.below { transform: translate(calc(var(--tx, 0) * 1px - 50%), calc(var(--ty, 0) * 1px + 12px)); }
+    :root[data-theme="light"] .spark-tip { background: var(--raised); }
+    .spark-tip strong {
+        display: block;
+        color: var(--heading);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: .875rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+    }
+    .spark-tip span { display: block; color: var(--muted); font-size: .75rem; font-variant-numeric: tabular-nums; }
 
     /* ------------------------------------------------------------- nodes --- */
     .nodes { display: grid; gap: 1rem; }

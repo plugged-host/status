@@ -4,8 +4,8 @@
   "private": true,
   "description": "status.plugged.host — Netlify static status page. Tailwind CSS v4 compiled locally to a committed stylesheet (no host build step).",
   "scripts": {
-    "build:css": "tailwindcss -i ./assets/status.src.css -o ./assets/status.v3.css --minify",
-    "watch:css": "tailwindcss -i ./assets/status.src.css -o ./assets/status.v3.css --watch"
+    "build:css": "tailwindcss -i ./assets/status.src.css -o ./assets/status.v4.css --minify",
+    "watch:css": "tailwindcss -i ./assets/status.src.css -o ./assets/status.v4.css --watch"
   },
   "devDependencies": {
     "@tailwindcss/cli": "4.3.3"

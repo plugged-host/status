@@ -1,5 +1,5 @@
 /* ==========================================================================
-   status.plugged.host — v3
+   status.plugged.host — v4
 
    The vhost CSP is style-src 'self' with no 'unsafe-inline', so nothing here
    may emit an inline style attribute. Meter fills ship as data-p on the .meter
@@ -65,14 +65,20 @@ const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char =>
 
 const number = value => new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(Number(value || 0));
 
-/* 1000-based to match PANEL_USE_BINARY_PREFIX=false in the panel. */
-const bytes = value => {
+/* Storage is 1000-based, the way disks are sold (and PANEL_USE_BINARY_PREFIX=false
+   in the panel). Memory is 1024-based: RAM is sized in powers of two, and wings
+   reports the kernel's MemTotal, so a 96 GB box reads ~94 GiB usable here rather
+   than "101 GB" from dividing binary bytes by 1000. */
+const bytes = (value, binary = false) => {
     const n = Number(value || 0);
     if (!n) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
-    const i = Math.min(Math.floor(Math.log(n) / Math.log(1000)), units.length - 1);
-    return `${number(n / 1000 ** i)} ${units[i]}`;
+    const base = binary ? 1024 : 1000;
+    const units = binary ? ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'] : ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+    const i = Math.min(Math.floor(Math.log(n) / Math.log(base)), units.length - 1);
+    return `${number(n / base ** i)} ${units[i]}`;
 };
+
+const clock = value => new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 
 const time = value => {
     const date = new Date(value);
@@ -100,15 +106,19 @@ const key = value => String(value ?? '').trim().toLowerCase();
 /* ------------------------------------------------- uptime (client-side) --- */
 
 /* The export pads uptime[].days[] to 90 entries, oldest first, filling the
-   pre-monitoring window with 'unknown'. Rolling % and streak are computed here
-   so no backend change is needed. A window's % counts operational days against
-   the days that actually carry a check inside that window. */
+   pre-monitoring window with 'unknown'. Recorded days carry total_checks and
+   operational_checks, so a window's % is check-weighted exactly like
+   uptime_percent: one degraded minute costs a minute, not the whole day.
+   Exports without the counts fall back to counting clean days. */
 function uptimeWindow(days, span) {
     const slice = days.slice(-span);
     const recorded = slice.filter(d => d && d.status && d.status !== 'unknown');
     if (!recorded.length) return null;
-    const up = recorded.filter(d => d.status === 'operational').length;
-    return { percent: up / recorded.length * 100, recorded: recorded.length };
+    const checks = recorded.reduce((n, d) => n + (Number(d.total_checks) || 0), 0);
+    const percent = checks > 0
+        ? recorded.reduce((n, d) => n + (Number(d.operational_checks) || 0), 0) / checks * 100
+        : recorded.filter(d => d.status === 'operational').length / recorded.length * 100;
+    return { percent, recorded: recorded.length };
 }
 
 /* Consecutive operational days counting back from the most recent entry. */
@@ -151,15 +161,16 @@ function uptimeWindowsHtml(stats) {
 
 /* data-p is a plain attribute, so it survives innerHTML under a strict CSP.
    The width itself is applied by applyMeters() once the node is in the DOM. */
-function metric(label, used, total, kind, history = []) {
+function metric(label, used, total, kind, series = null) {
     const percentage = pct(used, total);
-    const value = kind === 'cpu' ? `${number(used)}% / ${number(total)}%` : `${bytes(used)} / ${bytes(total)}`;
+    const binary = kind === 'memory';
+    const value = kind === 'cpu' ? `${number(used)}% / ${number(total)}%` : `${bytes(used, binary)} / ${bytes(total, binary)}`;
     return `<article class="metric">`
         + `<span class="metric-label">${escapeHtml(label)}</span>`
         + `<strong class="metric-value">${value}</strong>`
         + `<div class="meter" data-p="${percentage.toFixed(2)}" role="progressbar" aria-label="${escapeHtml(label)} utilization"`
         + ` aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(percentage)}"><i></i></div>`
-        + (history.length ? sparkline(history) : '')
+        + (series ? sparkline(label, kind, series, total) : '')
         + `<small>${number(percentage)}% utilized</small>`
         + `</article>`;
 }
@@ -173,17 +184,153 @@ function applyMeters(container) {
     });
 }
 
-function sparkline(values) {
-    const clean = values.map(Number).filter(Number.isFinite).slice(-60);
-    if (clean.length < 2) return '';
-    const max = Math.max(...clean, 1);
-    const points = clean
-        .map((v, i) => `${(i / (clean.length - 1) * 100).toFixed(2)},${(54 - v / max * 48).toFixed(2)}`)
-        .join(' ');
-    return `<svg class="spark" viewBox="0 0 100 58" preserveAspectRatio="none" aria-hidden="true">`
-        + `<polygon class="area" points="0,58 ${points} 100,58"></polygon>`
-        + `<polyline points="${points}"></polyline></svg>`;
+/* ---------------------------------------------------------- sparklines --- */
+
+/* history.json recent[] covers the last 60 minutes, one point per collector
+   run, with times[] parallel to the values. Unreachable minutes are omitted,
+   so a gap longer than GAP_MS breaks the line instead of bridging it. */
+const WINDOW_MS = 60 * 60 * 1000;
+const GAP_MS = 150 * 1000;
+
+/* Hover data per rendered sparkline, keyed by data-spark. The SVG only holds
+   geometry; the readout is built from here with textContent. */
+const sparks = new Map();
+
+/* The y axis is capacity-scaled (0 to the node's total), not stretched to the
+   series' own peak, so the line height agrees with the meter above it. */
+function sparkline(label, kind, series, total) {
+    const values = series.values || [];
+    const timed = Number.isFinite(series.end) && (series.times || []).length === values.length;
+    const points = values
+        .map((v, i) => ({ v: Number(v), t: timed ? Date.parse(series.times[i]) : null }))
+        .filter(p => Number.isFinite(p.v) && (!timed || Number.isFinite(p.t)))
+        .slice(-60);
+    if (points.length < 2) return '';
+
+    const capacity = total > 0 ? total : Math.max(...points.map(p => p.v), 1);
+    const start = series.end - WINDOW_MS;
+    points.forEach((p, i) => {
+        p.x = timed ? Math.min(100, Math.max(0, (p.t - start) / WINDOW_MS * 100)) : i / (points.length - 1) * 100;
+        p.pct = pct(p.v, capacity);
+        p.y = 57 - p.pct * 0.53;
+    });
+
+    const segments = [];
+    points.forEach((p, i) => {
+        if (i === 0 || (timed && p.t - points[i - 1].t > GAP_MS)) segments.push([]);
+        segments[segments.length - 1].push(p);
+    });
+    const shapes = segments.filter(s => s.length > 1).map(s => {
+        const line = s.map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ');
+        return `<polygon class="area" points="${s[0].x.toFixed(2)},58 ${line} ${s[s.length - 1].x.toFixed(2)},58"></polygon>`
+            + `<polyline points="${line}"></polyline>`;
+    }).join('');
+
+    const id = String(sparks.size);
+    const spark = { kind, points };
+    sparks.set(id, spark);
+    const last = points.length - 1;
+    const latest = readout(spark, points[last]);
+
+    return `<div class="spark-wrap" data-spark="${id}" tabindex="0" role="slider"`
+        + ` aria-label="${escapeHtml(label)} over the last 60 minutes" aria-valuemin="0" aria-valuemax="${last}"`
+        + ` aria-valuenow="${last}" aria-valuetext="${escapeHtml(`${latest.value}, ${latest.detail}`)}">`
+        + `<svg class="spark" viewBox="0 0 100 58" preserveAspectRatio="none" aria-hidden="true">${shapes}</svg>`
+        + `<i class="spark-x"></i><i class="spark-dot"></i></div>`;
 }
+
+/* Value leads (utilization %), the time follows; memory also names the bytes. */
+function readout(spark, point) {
+    const detail = [
+        spark.kind === 'memory' ? bytes(point.v, true) : null,
+        point.t != null ? clock(point.t) : null,
+    ].filter(Boolean).join(' · ');
+    return { value: `${number(point.pct)}%`, detail };
+}
+
+/* One floating readout for the page. It lives on <body> because .metric clips
+   its overflow, and it is positioned through the CSSOM (--tx/--ty) for the CSP. */
+const tip = document.createElement('div');
+tip.className = 'spark-tip';
+tip.hidden = true;
+tip.setAttribute('aria-hidden', 'true');
+tip.append(document.createElement('strong'), document.createElement('span'));
+document.body.append(tip);
+let activeSpark = null;
+
+function showPoint(wrap, index) {
+    const spark = sparks.get(wrap.dataset.spark);
+    const point = spark?.points[index];
+    if (!point) return;
+    if (activeSpark && activeSpark !== wrap) activeSpark.classList.remove('is-active');
+    activeSpark = wrap;
+
+    const { value, detail } = readout(spark, point);
+    wrap.dataset.index = String(index);
+    wrap.classList.add('is-active');
+    wrap.style.setProperty('--x', point.x.toFixed(2));
+    wrap.style.setProperty('--y', (point.y / 58 * 100).toFixed(2));
+    wrap.setAttribute('aria-valuenow', String(index));
+    wrap.setAttribute('aria-valuetext', `${value}, ${detail}`);
+
+    tip.firstElementChild.textContent = value;
+    tip.lastElementChild.textContent = detail;
+    tip.hidden = false;
+    const box = wrap.getBoundingClientRect();
+    const half = tip.offsetWidth / 2;
+    const x = Math.min(window.innerWidth - half - 8, Math.max(half + 8, box.left + box.width * point.x / 100));
+    const y = box.top + box.height * point.y / 58;
+    tip.style.setProperty('--tx', x.toFixed(1));
+    tip.style.setProperty('--ty', y.toFixed(1));
+    tip.classList.toggle('below', y - tip.offsetHeight - 12 < 0);
+}
+
+function hidePoint() {
+    activeSpark?.classList.remove('is-active');
+    activeSpark = null;
+    tip.hidden = true;
+}
+
+function nearestPoint(points, x) {
+    let best = 0;
+    points.forEach((p, i) => { if (Math.abs(p.x - x) < Math.abs(points[best].x - x)) best = i; });
+    return best;
+}
+
+function bindSparks(container) {
+    container.querySelectorAll('.spark-wrap[data-spark]').forEach(wrap => {
+        const spark = sparks.get(wrap.dataset.spark);
+        if (!spark) return;
+        const last = spark.points.length - 1;
+        const track = event => {
+            const box = wrap.getBoundingClientRect();
+            showPoint(wrap, nearestPoint(spark.points, (event.clientX - box.left) / box.width * 100));
+        };
+        wrap.addEventListener('pointermove', track);
+        wrap.addEventListener('pointerdown', track);
+        /* A lifted finger also fires pointerleave; touch readouts stay until
+           the next tap elsewhere or a scroll. */
+        wrap.addEventListener('pointerleave', event => { if (event.pointerType !== 'touch') hidePoint(); });
+        /* Keyboard focus starts at the latest point; a pointer that focused it has
+           already picked its own point. */
+        wrap.addEventListener('focus', () => { if (activeSpark !== wrap) showPoint(wrap, last); });
+        wrap.addEventListener('blur', hidePoint);
+        wrap.addEventListener('keydown', event => {
+            if (event.key === 'Escape') { hidePoint(); return; }
+            const current = Number(wrap.dataset.index ?? last);
+            const next = { ArrowLeft: current - 1, ArrowDown: current - 1, ArrowRight: current + 1, ArrowUp: current + 1, Home: 0, End: last }[event.key];
+            if (next === undefined) return;
+            event.preventDefault();
+            showPoint(wrap, Math.min(last, Math.max(0, next)));
+        });
+    });
+}
+
+document.addEventListener('pointerdown', event => {
+    if (activeSpark && !activeSpark.contains(event.target)) hidePoint();
+});
+window.addEventListener('scroll', hidePoint, { passive: true });
+window.addEventListener('resize', hidePoint);
 
 /* --------------------------------------------------- incident indexing --- */
 
@@ -214,6 +361,8 @@ function flagFor(label, byLabel) {
 /* ------------------------------------------------------------ renders ---- */
 
 function renderCurrent(data, history, incidentIndex) {
+    hidePoint();
+    sparks.clear();
     const generated = new Date(data.generated_at);
     const stale = !Number.isFinite(generated.valueOf()) || Date.now() - generated.valueOf() > STALE_AFTER;
 
@@ -270,11 +419,12 @@ function renderCurrent(data, history, incidentIndex) {
 
     const globalGrid = document.querySelector('[data-global]');
     globalGrid.innerHTML = metric('CPU', global.cpu_used, global.cpu_total, 'cpu')
-        + metric('Memory', global.memory_used, global.memory_total, 'bytes')
-        + metric('Storage', global.storage_used, global.storage_total, 'bytes');
+        + metric('Memory', global.memory_used, global.memory_total, 'memory')
+        + metric('Storage', global.storage_used, global.storage_total, 'storage');
     applyMeters(globalGrid);
 
     const recent = history.recent || [];
+    const historyEnd = Date.parse(history.generated_at);
     const nodes = document.querySelector('[data-nodes]');
     nodes.innerHTML = (data.nodes || []).map(node => {
         const name = node.display_name ?? node.label;
@@ -304,14 +454,15 @@ function renderCurrent(data, history, incidentIndex) {
             + `<span class="component-state">${escapeHtml(labels[node.status] || node.status)}</span>`
             + `</div></header>`
             + `<div class="resource-grid">`
-            + metric('CPU', node.metrics?.cpu_used, node.metrics?.cpu_total, 'cpu', series.cpu || [])
-            + metric('Memory', node.metrics?.memory_used, node.metrics?.memory_total, 'bytes', series.memory || [])
-            + metric('Storage', node.metrics?.storage_used, node.metrics?.storage_total, 'bytes')
+            + metric('CPU', node.metrics?.cpu_used, node.metrics?.cpu_total, 'cpu', { values: series.cpu, times: series.times, end: historyEnd })
+            + metric('Memory', node.metrics?.memory_used, node.metrics?.memory_total, 'memory', { values: series.memory, times: series.times, end: historyEnd })
+            + metric('Storage', node.metrics?.storage_used, node.metrics?.storage_total, 'storage')
             + `</div>`
             + (statChips.length ? `<div class="node-stats">${statChips.join('')}</div>` : '')
             + `</article>`;
     }).join('') || '<div class="empty">No node data has been published yet.</div>';
     applyMeters(nodes);
+    bindSparks(nodes);
 }
 
 function renderHistory(data) {
