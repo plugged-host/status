@@ -548,8 +548,8 @@ async function load() {
     let incidents = null;
     const backendOrigin = getDataOrigin();
 
-    // 1. Try local relative fetch (/data/*.json). On Cloudflare Pages a Function
-    //    (functions/data) proxies it to the panel, so the "local" path is live data.
+    // 1. Try local relative fetch (/data/*.json). On Cloudflare the Worker
+    //    (worker.js) proxies it to the panel, so the "local" path is live data.
     try {
         const [c, h, i] = await fetchStatusFiles('');
         if (c) {

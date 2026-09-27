@@ -1,0 +1,17 @@
+// Cloudflare Workers + static assets. No build step: the repo root is the asset
+// directory (.assetsignore keeps tooling and sources out of the upload), and
+// worker.js only runs for the panel-data proxy routes and unmatched paths.
+// "name" must match the Worker's name in the Cloudflare dashboard.
+{
+    "name": "status-plugged",
+    "main": "worker.js",
+    "compatibility_date": "2026-09-25",
+    "assets": {
+        "directory": ".",
+        "binding": "ASSETS",
+        "run_worker_first": ["/data/*", "/feed.xml"]
+    },
+    "observability": {
+        "enabled": true
+    }
+}

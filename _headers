@@ -1,6 +1,6 @@
-# Cloudflare Pages headers. /data/* and /feed.xml are served by Pages Functions
-# (functions/), which set their own headers — Pages does not apply this file to
-# Function responses.
+# Static-asset headers (Cloudflare Workers assets). /data/* and /feed.xml are
+# answered by worker.js, which sets its own headers — this file does not apply
+# to Worker responses.
 /*
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff

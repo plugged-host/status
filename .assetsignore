@@ -1,0 +1,15 @@
+# Everything in the repo root is uploaded as a public asset unless listed here
+# (gitignore syntax). Keep tooling, sources and host config out of the site.
+.git
+.gitignore
+.assetsignore
+.wrangler
+node_modules
+package.json
+package-lock.json
+wrangler.jsonc
+worker.js
+netlify.toml
+vercel.json
+assets/*.src.css
+README.md
