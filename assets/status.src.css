@@ -1,22 +1,38 @@
 /* ==========================================================================
    status.plugged.host — Tailwind CSS v4 source
 
-   Compiled locally to the committed assets/status.v4.css (no host build step):
+   Compiled locally to the committed assets/status.v5.css (no host build step):
      export PATH="/root/.nvm/versions/node/v26.9.0/bin:$PATH"
      cd /var/www/status && npm install && npm run build:css
 
-   The vhost CSP is style-src 'self' with no 'unsafe-inline', so nothing here
-   or in status.v4.js may emit an inline <style> or a style="" attribute. The
-   only dynamic values (meter widths) ride --p, which status.v4.js writes
-   through the CSSOM against the @property --p declaration below — CSP permits
-   scripted style mutation, only parsed inline style is blocked.
+   The CSP is style-src 'self' with no 'unsafe-inline', so nothing here or in
+   status.v5.js may emit an inline <style> or a style="" attribute. Dynamic
+   values (meter fills, the graph crosshair and readout position) ride custom
+   properties that status.v5.js sets through the CSSOM.
 
-   Hybrid strategy: the JS builds class strings at runtime (dot ${status},
-   bar ${status}, badge ${impact}, overall status-${state}, .meter[data-p] +
-   toggled .warn/.hot, …) that Tailwind's scanner cannot see. Every such rule
-   is hand-authored inside @layer base / @layer components (always emitted),
-   retokenized onto the unified theme tokens. Utilities are used for new,
-   static markup only.
+   status.v5.js builds class strings at runtime (dot ${status},
+   bar ${status}, badge ${impact}, overall status-${state}, …) that Tailwind's
+   scanner cannot see, so every component is hand-authored in @layer base /
+   @layer components, which Tailwind always emits. Source scanning is off
+   (source(none)): scanning the script turned words like "blur" and "resize"
+   into stray utilities. To use utilities in the HTML, add
+   @source "../index.html"; below the import.
+
+   Flat, per the UI rules in /var/www/CLAUDE.md: no shadows, no glows, no
+   backdrop blur, no hover lift, no animation. A card is a fill with no border.
+   ========================================================================== */
+
+@import "tailwindcss" source(none);
+
+/* ==========================================================================
+   SHARED TOKEN LAYER · BEGIN
+   Byte-for-byte identical in html/assets/app.src.css and
+   status/assets/status.src.css: compare everything between the BEGIN and END
+   markers. It mirrors the panel theme
+   (pelican[dev]/plugins/plugged-host-theme-v2/resources/css/theme.css) in its
+   flat 2.1 form: royal-blue accent, obsidian surfaces, cards drawn as a fill
+   with no border, no shadows, no glows. The one gradient is the dark page
+   floor (#101319 -> #0b0d10), the same as the panel's .fi-body.
    ========================================================================== */
 
 @font-face {
@@ -55,20 +71,10 @@
     unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
-/* ==========================================================================
-   plugged.host — shared theme token layer. Unified onto the teal
-   --color-primary-* scale + a semantic --color-status-* set. No Nord ramp.
-   CSP-safe: no inline style; dynamic values still ride --p via the CSSOM.
-   ========================================================================== */
-
-@import "tailwindcss";
-
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-@source "./index.html";
-@source "./assets/status.v4.js";
-
-/* Dynamic meter/progress fill. status.v4.js writes --p through the CSSOM. */
+/* Meter fills. The page scripts write --p through the CSSOM: the CSP forbids a
+   parsed style="" attribute, not scripted style changes. */
 @property --p {
     syntax: '<number>';
     initial-value: 0;
@@ -76,8 +82,11 @@
 }
 
 @theme {
-    /* Pelican Theme v2 primary blue scale.
-       Matches /var/www/pelican/plugins/plugged-host-theme-v2/resources/css/theme.css */
+    --font-sans: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    /* The panel's primary scale (Tailwind blue shifted one rung darker, so
+       primary-600 is the --phv2-accent fill). */
     --color-primary-50:  #eff6ff;
     --color-primary-100: #dbeafe;
     --color-primary-200: #93c5fd;
@@ -90,9 +99,9 @@
     --color-primary-900: #172554;
     --color-primary-950: #0d1330;
 
-    /* Theme v2 semantic status set — single source of truth for both sites + the canvas.
-       Status enum: operational | degraded | maintenance | partial_outage
-                    | major_outage | offline | unknown. */
+    /* One colour per status in the export's enum:
+       operational | degraded | maintenance | partial_outage | major_outage
+       | offline | unknown. */
     --color-status-operational:    #22c55e;
     --color-status-degraded:       #f59e0b;
     --color-status-maintenance:    #3b82f6;
@@ -102,220 +111,141 @@
     --color-status-unknown:        #71717a;
 }
 
-/* ------------------------------------------------- runtime surface / ink --- */
-:root {
+/* Dark is the default, as in the panel; the theme toggle swaps in the light
+   set below. Components only use the site tokens in the second block, never a
+   --phv2-* knob directly, so the light set has one list to redefine. */
+:root,
+:root[data-theme="dark"] {
     color-scheme: dark;
 
-    /* Pelican Theme v2 dark surfaces & palette by default */
-    --page: #0b0d10;
-    --page-deep: #101319;
-    --page-gradient: linear-gradient(to bottom, #101319, #0b0d10);
-    --card: rgba(255, 255, 255, 0.05);
-    --card-line: rgba(255, 255, 255, 0.06);
-    --raised: rgba(255, 255, 255, 0.1);
-    --sunken: rgba(15, 17, 22, 0.5);
-    --text: #ffffff;
-    --heading: #ffffff;
-    --muted: #9ca3af;
-    --faint: #71717a;
-    --line: rgba(255, 255, 255, 0.06);
-    --divide: rgba(255, 255, 255, 0.06);
-    --grid-line: rgba(255, 255, 255, 0.035);
-    --accent: #3b82f6;
-    --accent-soft: rgba(29, 78, 216, 0.12);
-    --track: rgba(255, 255, 255, 0.08);
-    --grad-a: #3b82f6;
-    --grad-b: #60a5fa;
-
-    --red-text: #f87171;
-    --orange-text: #fb923c;
-    --blue-text: #60a5fa;
-
-    /* Theme v2 Knobs */
+    /* Panel knobs, verbatim from theme.css. */
     --phv2-accent: #1d4ed8;
     --phv2-accent-hover: #1e40af;
     --phv2-accent-bright: #3b82f6;
     --phv2-accent-glow: #60a5fa;
+    --phv2-accent-soft: rgb(29 78 216 / 0.1);
+    --phv2-accent-tint: rgb(29 78 216 / 0.15);
     --phv2-bg-top: #101319;
     --phv2-bg-bottom: #0b0d10;
-    --phv2-sidebar: #1c1e23;
-    --phv2-sunken: rgba(15, 17, 22, 0.5);
+    --phv2-sunken: rgb(15 17 22 / 0.5);
     --phv2-dropdown: #181a1e;
-    --phv2-modal: #1a1c20;
-    --phv2-raise: rgba(255, 255, 255, 0.05);
-    --phv2-raise-2: rgba(255, 255, 255, 0.1);
-    --phv2-raise-3: rgba(255, 255, 255, 0.15);
-    --phv2-hairline: rgba(255, 255, 255, 0.05);
+    --phv2-raise: rgb(255 255 255 / 0.05);
+    --phv2-raise-2: rgb(255 255 255 / 0.1);
+    --phv2-raise-3: rgb(255 255 255 / 0.15);
+    --phv2-hairline: rgb(255 255 255 / 0.05);
     --phv2-text: #ffffff;
     --phv2-text-nav: #d1d5db;
     --phv2-text-muted: #9ca3af;
     --phv2-text-faint: #71717a;
 
-    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.35);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.35);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+    /* Site tokens. */
+    --page: var(--phv2-bg-bottom);
+    --page-floor: linear-gradient(to bottom, var(--phv2-bg-top), var(--phv2-bg-bottom));
+    --bar: var(--phv2-bg-top);                /* the sticky top bar */
+    --surface: var(--phv2-raise);             /* cards: a fill, never a border too */
+    --surface-2: var(--phv2-raise-2);         /* secondary buttons, badges, active tab */
+    --surface-3: var(--phv2-raise-3);         /* secondary button hover */
+    --popover: var(--phv2-dropdown);          /* floating readouts */
+    --hairline: var(--phv2-hairline);         /* dividers between rows */
+    --track: var(--phv2-raise-2);             /* the empty part of a meter or bar */
+    --text: var(--phv2-text);
+    --text-nav: var(--phv2-text-nav);
+    --muted: var(--phv2-text-muted);
+    --faint: var(--phv2-text-faint);
+    --accent: var(--phv2-accent);             /* fills only */
+    --accent-hover: var(--phv2-accent-hover);
+    --accent-text: var(--phv2-accent-bright); /* the accent as text, links, rings */
+    --accent-tint: var(--phv2-accent-tint);   /* callout fill */
+    --on-accent: #ffffff;
+    --red-text: #f87171;
+    --orange-text: #fb923c;
+    --blue-text: #60a5fa;
+    --focus: var(--phv2-accent-bright);
 
-    --r-card: 1rem;
-    --r-badge: 0.5rem;
-    --r-sm: 0.5rem;
-    --r-pill: 9999px;
-
-    --focus: #3b82f6;
-    --ink-rgb: 59, 130, 246;
-    --grain: 0.025;
+    --radius-card: 1rem;      /* rounded-2xl: cards */
+    --radius-control: 0.5rem; /* rounded-lg: badges, nav items, icon buttons */
+    --radius-pill: 9999px;    /* rounded-full: buttons */
 }
 
 :root[data-theme="light"] {
     color-scheme: light;
 
-    /* Light mode surface tokens */
-    --page: #f8fafc;
-    --page-deep: #f1f5f9;
-    --page-gradient: none;
-    --card: #ffffff;
-    --card-line: rgba(15, 23, 42, 0.08);
-    --raised: #ffffff;
-    --sunken: #f1f5f9;
-    --text: #0f172a;
-    --heading: #0f172a;
-    --muted: #64748b;
-    --faint: #94a3b8;
-    --line: #e2e8f0;
-    --divide: #e2e8f0;
-    --grid-line: rgba(15, 23, 42, 0.04);
-    --accent: #1d4ed8;
-    --accent-soft: rgba(29, 78, 216, 0.08);
+    --page: #ffffff;
+    --page-floor: none;
+    --bar: #ffffff;
+    --surface: #f1f5f9;
+    --surface-2: #e2e8f0;
+    --surface-3: #cbd5e1;
+    --popover: #ffffff;
+    --hairline: #e2e8f0;
     --track: #e2e8f0;
-    --grad-a: #1d4ed8;
-    --grad-b: #3b82f6;
-
+    --text: #0f172a;
+    --text-nav: #334155;
+    --muted: #475569;
+    --faint: #64748b;
+    --accent: #1d4ed8;
+    --accent-hover: #1e40af;
+    --accent-text: #1d4ed8;
+    --accent-tint: rgb(29 78 216 / 0.1);
+    --on-accent: #ffffff;
     --red-text: #b91c1c;
     --orange-text: #c2410c;
     --blue-text: #1d4ed8;
-
-    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
-
     --focus: #1d4ed8;
-    --ink-rgb: 29, 78, 216;
-    --grain: 0.02;
 }
 
-:root[data-theme="dark"] {
-    color-scheme: dark;
-    --page: #0b0d10;
-    --page-deep: #101319;
-    --page-gradient: linear-gradient(to bottom, #101319, #0b0d10);
-    --card: rgba(255, 255, 255, 0.05);
-    --card-line: rgba(255, 255, 255, 0.06);
-    --raised: rgba(255, 255, 255, 0.1);
-    --sunken: rgba(15, 17, 22, 0.5);
-    --text: #ffffff;
-    --heading: #ffffff;
-    --muted: #9ca3af;
-    --faint: #71717a;
-    --line: rgba(255, 255, 255, 0.06);
-    --divide: rgba(255, 255, 255, 0.06);
-    --grid-line: rgba(255, 255, 255, 0.035);
-    --accent: #3b82f6;
-    --accent-soft: rgba(29, 78, 216, 0.12);
-    --track: rgba(255, 255, 255, 0.08);
-    --grad-a: #3b82f6;
-    --grad-b: #60a5fa;
-    --red-text: #f87171;
-    --orange-text: #fb923c;
-    --blue-text: #60a5fa;
-    --phv2-accent: #1d4ed8;
-    --phv2-accent-hover: #1e40af;
-    --phv2-accent-bright: #3b82f6;
-    --phv2-accent-glow: #60a5fa;
-    --phv2-bg-top: #101319;
-    --phv2-bg-bottom: #0b0d10;
-    --phv2-sidebar: #1c1e23;
-    --phv2-sunken: rgba(15, 17, 22, 0.5);
-    --phv2-dropdown: #181a1e;
-    --phv2-modal: #1a1c20;
-    --phv2-raise: rgba(255, 255, 255, 0.05);
-    --phv2-raise-2: rgba(255, 255, 255, 0.1);
-    --phv2-raise-3: rgba(255, 255, 255, 0.15);
-    --phv2-hairline: rgba(255, 255, 255, 0.05);
-    --phv2-text: #ffffff;
-    --phv2-text-nav: #d1d5db;
-    --phv2-text-muted: #9ca3af;
-    --phv2-text-faint: #71717a;
-    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.35);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.35);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
-    --focus: #3b82f6;
-    --ink-rgb: 59, 130, 246;
-    --grain: 0.025;
-}
-
-/* Expose the runtime surface tokens as Tailwind color utilities so bg-card,
-   text-muted, border-line, etc. follow the light/dark swap automatically. */
+/* The site tokens as Tailwind colours, so a utility such as bg-surface or
+   text-muted follows the theme toggle too. */
 @theme inline {
     --color-page: var(--page);
-    --color-page-deep: var(--page-deep);
-    --color-card: var(--card);
-    --color-raised: var(--raised);
+    --color-surface: var(--surface);
+    --color-surface-2: var(--surface-2);
     --color-text: var(--text);
-    --color-heading: var(--heading);
     --color-muted: var(--muted);
     --color-faint: var(--faint);
-    --color-line: var(--line);
-    --color-divide: var(--divide);
+    --color-hairline: var(--hairline);
     --color-accent: var(--accent);
-    --color-track: var(--track);
+    --color-accent-text: var(--accent-text);
 }
 
+/* SHARED TOKEN LAYER · END ================================================== */
+
 /* ==========================================================================
-   BASE — element defaults + resets. Always emitted.
+   BASE
    ========================================================================== */
 @layer base {
-    * { box-sizing: border-box; }
-
     html { -webkit-text-size-adjust: 100%; }
 
     body {
-        margin: 0;
         min-width: 320px;
         background-color: var(--page);
-        background-image: var(--page-gradient, none);
+        background-image: var(--page-floor);
         background-attachment: fixed;
         color: var(--text);
-        /* Pelican Theme v2: Space Grotesk everywhere */
-        font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+        font-family: var(--font-sans);
         font-size: 1rem;
-        font-weight: 400;
         line-height: 1.55;
-        font-optical-sizing: auto;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
     }
 
     a { color: inherit; }
-    img, svg { max-width: 100%; }
-    button { font: inherit; color: inherit; }
-    :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--r-sm); }
+    :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
     h1, h2, h3 {
-        margin: 0;
-        color: var(--heading);
+        color: var(--text);
         font-weight: 700;
-        line-height: 1.15;
-        letter-spacing: -.025em;
+        line-height: 1.2;
+        letter-spacing: -.02em;
         text-wrap: balance;
     }
 }
 
 /* ==========================================================================
-   COMPONENTS — hand-authored UI. Always emitted (never tree-shaken), so the
-   runtime-built class strings survive. Retokenized onto the unified tokens.
+   COMPONENTS
    ========================================================================== */
 @layer components {
-    .shell { width: min(1100px, calc(100% - 2.5rem)); margin-inline: auto; }
-    .num { font-variant-numeric: tabular-nums; }
+    .shell { width: min(1100px, 100% - 2rem); margin-inline: auto; }
 
     .skip {
         position: fixed;
@@ -323,608 +253,377 @@
         left: 1rem;
         z-index: 99;
         padding: .625rem 1rem;
-        border: 1px solid var(--line);
-        border-radius: var(--r-pill);
-        background: var(--card);
-        box-shadow: var(--shadow-md);
+        border-radius: var(--radius-pill);
+        background: var(--accent);
+        color: var(--on-accent);
         text-decoration: none;
         font-size: .875rem;
         font-weight: 600;
-        transition: top .2s ease;
     }
     .skip:focus { top: 1rem; }
 
-    /* Same masked grid as the marketing page, so the two sites read as one family. */
-    .bg-grid {
-        position: fixed;
-        inset: 0;
-        z-index: -1;
-        pointer-events: none;
-        contain: strict;
-        background-image:
-            linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
-            linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
-        background-size: 72px 72px;
-        background-position: center top;
-        -webkit-mask-image: radial-gradient(ellipse 120% 70% at 50% 0%, #000 5%, transparent 70%);
-        mask-image: radial-gradient(ellipse 120% 70% at 50% 0%, #000 5%, transparent 70%);
-    }
-
-    /* -------------------------------------------------------- shared card --- */
-    /* Theme v2 translucent card surfaces: white/5 raise with hairline border. */
-    .overall,
-    .component-list,
-    .metric,
-    .node,
-    .uptime-row,
-    .incident {
-        border: 1px solid var(--card-line);
-        border-radius: var(--r-card);
-        background: var(--card);
-        box-shadow: var(--shadow-md);
-    }
-
-    [data-theme="dark"] .overall,
-    [data-theme="dark"] .component-list,
-    [data-theme="dark"] .metric,
-    [data-theme="dark"] .node,
-    [data-theme="dark"] .uptime-row,
-    [data-theme="dark"] .incident {
-        border: 1px solid var(--card-line);
-        background: var(--card);
-        box-shadow: none;
-    }
-
-    [data-theme="dark"] .overall:hover,
-    [data-theme="dark"] .component-list:hover,
-    [data-theme="dark"] .metric:hover,
-    [data-theme="dark"] .node:hover,
-    [data-theme="dark"] .uptime-row:hover,
-    [data-theme="dark"] .incident:hover {
-        border-color: rgba(255, 255, 255, 0.12);
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.35);
-    }
-
-    /* ---------------------------------------------------------- topbar ----- */
+    /* ---------------------------------------------------------- top bar --- */
     .topbar {
         position: sticky;
         top: 0;
         z-index: 20;
-        border-bottom: 1px solid var(--divide);
-        background: var(--page);
-        transition: border-color .25s ease, background .25s ease;
-    }
-    [data-theme="dark"] .topbar {
-        background: rgba(16, 19, 25, 0.88);
-        backdrop-filter: blur(12px);
-        border-bottom-color: rgba(255, 255, 255, 0.06);
+        border-bottom: 1px solid var(--hairline);
+        background: var(--bar);
     }
     .nav {
-        min-height: 68px;
+        min-height: 4rem;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 1rem;
+        gap: .75rem;
     }
     .brand {
         display: inline-flex;
         align-items: center;
         gap: .625rem;
-        color: var(--heading);
+        min-width: 0;
+        color: var(--text);
         text-decoration: none;
-        font-size: 1rem;
         font-weight: 700;
         letter-spacing: -.02em;
+        white-space: nowrap;
     }
-    .brand img {
-        width: 32px; height: 32px;
-        border-radius: var(--r-sm);
-        object-fit: cover;
-    }
-    .brand em { color: var(--color-primary-500); font-style: normal; }
-    .brand .sep { color: var(--faint); font-weight: 400; }
+    .brand img { width: 32px; height: 32px; border-radius: var(--radius-control); }
+    .brand em { color: var(--accent-text); font-style: normal; }
+    .brand .suffix { color: var(--faint); font-weight: 500; }
 
-    .nav-actions { display: flex; align-items: center; gap: .125rem; }
+    .nav-actions { display: flex; align-items: center; gap: .5rem; }
 
-    .nav-actions > a {
-        padding: .4375rem .6875rem;
-        border-radius: var(--r-sm);
-        color: var(--muted);
-        text-decoration: none;
-        font-size: .875rem;
-        font-weight: 500;
-        transition: color .18s ease, background .18s ease;
-    }
-    .nav-actions > a:hover { color: var(--heading); background: var(--line); }
-    [data-theme="dark"] .nav-actions > a:hover { color: var(--heading); background: rgba(255, 255, 255, .05); }
-
-    .theme {
-        width: 36px; height: 36px;
-        margin-inline: .375rem;
+    /* Icon-only control (the theme switch): the panel's .fi-icon-btn. */
+    .icon-button {
+        width: 2.25rem;
+        height: 2.25rem;
         display: grid;
         place-items: center;
-        border: 0;
-        border-radius: var(--r-sm);
-        background: transparent;
+        flex: none;
+        border-radius: var(--radius-control);
         color: var(--muted);
         cursor: pointer;
-        transition: color .18s ease, background .18s ease;
     }
-    .theme:hover { color: var(--heading); background: var(--line); }
-    [data-theme="dark"] .theme:hover { background: rgba(255, 255, 255, .05); }
-    .theme svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; }
+    .icon-button:hover { background: var(--surface); color: var(--text); }
+    .icon-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; }
     .icon-sun { display: none; }
     [data-theme="dark"] .icon-sun { display: block; }
     [data-theme="dark"] .icon-moon { display: none; }
 
-    /* Primary button — Pelican Theme v2 signature blue pill */
+    /* Buttons: the panel's .fi-btn pill. Secondary is the default; .primary
+       is the one filled button a view gets. */
     .button {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: .5rem;
-        min-height: 2.25rem;
-        padding: .375rem 1.125rem;
-        border: 1px solid transparent;
-        border-radius: var(--r-pill);
-        background: var(--phv2-accent, #1d4ed8);
-        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.15);
-        color: #ffffff;
+        min-height: 2.75rem;
+        padding: .5rem 1.25rem;
+        border-radius: var(--radius-pill);
+        background: var(--surface-2);
+        color: var(--text);
         text-decoration: none;
-        font-size: .8125rem;
+        font-size: .875rem;
         font-weight: 500;
-        transition: background .15s ease, box-shadow .15s ease, transform .1s ease;
+        white-space: nowrap;
+        transition: background-color .15s ease;
     }
-    .button:hover { background: var(--phv2-accent-hover, #1e40af); box-shadow: 0 4px 12px 0 rgba(29, 78, 216, 0.35); transform: translateY(-1px); }
-    .button:active { transform: scale(0.97); box-shadow: none; }
+    .button:hover { background: var(--surface-3); }
+    .button:active { transform: scale(.97); }
+    .button.primary { background: var(--accent); color: var(--on-accent); }
+    .button.primary:hover { background: var(--accent-hover); }
+    .button.small { min-height: 2.125rem; padding: .375rem .875rem; font-size: .8125rem; }
 
-    /* -------------------------------------------------------- page head ---- */
-    main { padding: clamp(2rem, 5vw, 3.5rem) 0 clamp(3.5rem, 8vw, 6rem); }
+    /* -------------------------------------------------------- page head --- */
+    main { padding: 2.5rem 0 4rem; }
 
     .page-head {
         display: flex;
+        flex-wrap: wrap;
         justify-content: space-between;
-        align-items: end;
-        gap: 2rem;
-        margin-bottom: 1.5rem;
+        align-items: baseline;
+        gap: .25rem 1.5rem;
+        margin-bottom: 1.25rem;
     }
+    .page-head h1 { font-size: clamp(1.75rem, 4vw, 2.25rem); }
+    .updated { color: var(--faint); font-size: .8125rem; }
+    .updated time { color: var(--muted); font-variant-numeric: tabular-nums; }
 
-    .eyebrow {
-        display: inline-flex;
-        align-items: center;
-        gap: .5rem;
-        margin: 0 0 .75rem;
-        padding: .3rem .7rem;
-        border: 1px solid var(--line);
-        border-radius: var(--r-badge);
-        background: var(--card);
-        box-shadow: var(--shadow-xs);
-        color: var(--muted);
-        font-size: .75rem;
-        font-weight: 500;
-    }
-    .page-head h1 { font-size: clamp(1.875rem, 4vw, 2.75rem); }
-    .updated { color: var(--faint); font-size: .8125rem; text-align: right; }
-    .updated time {
-        display: block;
-        margin-top: .125rem;
-        color: var(--heading);
-        font-size: .875rem;
-        font-weight: 600;
-        font-variant-numeric: tabular-nums;
-    }
-
-    /* ----------------------------------------------------------- overall --- */
-    /* Pelican Theme v2 signature callout styling */
+    /* ---------------------------------------------------- overall state --- */
+    /* The panel's callout, drawn as a tinted fill only. */
     .overall {
         display: flex;
         align-items: center;
         gap: .875rem;
         padding: 1.125rem 1.25rem;
-        margin-bottom: clamp(2rem, 4vw, 3rem);
-        border: 1px solid var(--card-line);
-        border-left: 4px solid var(--color-status-unknown);
-        border-radius: 0.75rem;
-        background: var(--card);
-        transition: background .2s ease, border-color .2s ease;
+        border-radius: var(--radius-card);
+        background: var(--surface);
     }
-    .status-mark {
-        position: relative;
-        flex: 0 0 auto;
-        width: 9px; height: 9px;
-        border-radius: 50%;
-        background: var(--color-status-unknown);
-        color: var(--color-status-unknown);
-    }
-    .status-mark::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        background: currentColor;
-        animation: ping 2.4s cubic-bezier(0, 0, .2, 1) infinite;
-    }
-    @keyframes ping { to { transform: scale(3); opacity: 0; } }
-
+    .overall-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--color-status-unknown); }
     .overall-body { flex: 1 1 auto; min-width: 0; }
-    .overall strong { display: block; color: var(--heading); font-size: 1rem; font-weight: 600; }
-    .overall span { color: var(--muted); font-size: .875rem; }
+    .overall strong { display: block; color: var(--text); font-size: 1.0625rem; font-weight: 600; }
+    .overall-body span { display: block; color: var(--muted); font-size: .875rem; }
 
-    /* Active-incident affordance on the banner. */
+    .overall.status-unknown { background: var(--surface); }
+    .overall.status-operational { background: color-mix(in srgb, var(--color-status-operational) 12%, transparent); }
+    .overall.status-degraded { background: color-mix(in srgb, var(--color-status-degraded) 12%, transparent); }
+    .overall.status-maintenance { background: color-mix(in srgb, var(--color-status-maintenance) 12%, transparent); }
+    .overall.status-partial_outage { background: color-mix(in srgb, var(--color-status-partial_outage) 12%, transparent); }
+    .overall.status-major_outage,
+    .overall.status-offline { background: color-mix(in srgb, var(--color-status-major_outage) 12%, transparent); }
+
+    .status-operational .overall-dot { background: var(--color-status-operational); }
+    .status-degraded .overall-dot { background: var(--color-status-degraded); }
+    .status-maintenance .overall-dot { background: var(--color-status-maintenance); }
+    .status-partial_outage .overall-dot { background: var(--color-status-partial_outage); }
+    .status-major_outage .overall-dot,
+    .status-offline .overall-dot { background: var(--color-status-major_outage); }
+
+    /* Link to the incident list while one is open: a tertiary text link. */
     .overall-flag {
         flex: none;
-        display: inline-flex;
-        align-items: center;
-        gap: .375rem;
-        padding: .3125rem .625rem;
-        border-radius: var(--r-badge);
-        background: var(--accent-soft);
-        color: var(--accent);
-        text-decoration: none;
-        font-size: .75rem;
-        font-weight: 600;
-        white-space: nowrap;
-        transition: background .18s ease;
-    }
-    .overall-flag:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
-    .overall-flag i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-
-    /* Theme v2 callout tints and status mark mapping */
-    .overall.status-operational {
-        border-left-color: var(--color-status-operational);
-        background: color-mix(in srgb, var(--color-status-operational) 7%, var(--card));
-    }
-    .overall.status-degraded {
-        border-left-color: var(--color-status-degraded);
-        background: color-mix(in srgb, var(--color-status-degraded) 7%, var(--card));
-    }
-    .overall.status-maintenance {
-        border-left-color: var(--color-status-maintenance);
-        background: color-mix(in srgb, var(--color-status-maintenance) 7%, var(--card));
-    }
-    .overall.status-partial_outage {
-        border-left-color: var(--color-status-partial_outage);
-        background: color-mix(in srgb, var(--color-status-partial_outage) 7%, var(--card));
-    }
-    .overall.status-major_outage,
-    .overall.status-offline {
-        border-left-color: var(--color-status-major_outage);
-        background: color-mix(in srgb, var(--color-status-major_outage) 7%, var(--card));
+        color: var(--accent-text);
+        font-size: .875rem;
+        font-weight: 500;
+        text-underline-offset: 3px;
     }
 
-    /* Status colour map — single source of truth for marks, dots, bars. */
-    .status-operational .status-mark,    .dot.operational,    .bar.operational    { background: var(--color-status-operational);    color: var(--color-status-operational); }
-    .status-degraded .status-mark,        .dot.degraded,       .bar.degraded       { background: var(--color-status-degraded);        color: var(--color-status-degraded); }
-    .status-maintenance .status-mark,     .dot.maintenance,    .bar.maintenance    { background: var(--color-status-maintenance);     color: var(--color-status-maintenance); }
-    .status-partial_outage .status-mark,  .dot.partial_outage, .bar.partial_outage { background: var(--color-status-partial_outage);  color: var(--color-status-partial_outage); }
-    .status-major_outage .status-mark,    .dot.major_outage,   .bar.major_outage   { background: var(--color-status-major_outage);    color: var(--color-status-major_outage); }
-    .status-offline .status-mark,         .dot.offline,        .bar.offline        { background: var(--color-status-offline);         color: var(--color-status-offline); }
-    .status-unknown .status-mark,         .dot.unknown                             { background: var(--color-status-unknown);         color: var(--color-status-unknown); }
+    /* Status dots on rows, and the uptime bars, share one colour map. */
+    .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--color-status-unknown); }
+    .dot.unknown { background: var(--color-status-unknown); }
+    .bar.unknown { background: var(--track); }
+    .dot.operational,    .bar.operational    { background: var(--color-status-operational); }
+    .dot.degraded,       .bar.degraded       { background: var(--color-status-degraded); }
+    .dot.maintenance,    .bar.maintenance    { background: var(--color-status-maintenance); }
+    .dot.partial_outage, .bar.partial_outage { background: var(--color-status-partial_outage); }
+    .dot.major_outage,   .bar.major_outage   { background: var(--color-status-major_outage); }
+    .dot.offline,        .bar.offline        { background: var(--color-status-offline); }
 
     /* ---------------------------------------------------------- sections --- */
-    .section { margin-top: clamp(2.25rem, 5vw, 3.25rem); }
+    .section { margin-top: 3rem; }
     .section-head {
         display: flex;
+        flex-wrap: wrap;
         justify-content: space-between;
         align-items: end;
-        gap: 1rem;
+        gap: .75rem 1.5rem;
         margin-bottom: 1rem;
     }
+    .section-head > div { min-width: 0; max-width: 60ch; }
     .section h2 { font-size: 1.25rem; }
-    .section-copy { margin: .25rem 0 0; color: var(--muted); font-size: .875rem; }
-    .section-head > a {
-        flex: none;
-        padding: .3rem .6875rem;
-        border-radius: var(--r-sm);
-        color: var(--accent);
-        text-decoration: none;
-        font-size: .8125rem;
+    .section-copy { margin-top: .25rem; color: var(--muted); font-size: .875rem; }
+    .section-link {
+        color: var(--accent-text);
+        font-size: .875rem;
         font-weight: 500;
-        transition: background .18s ease;
+        text-underline-offset: 3px;
     }
-    .section-head > a:hover { background: var(--page-deep); }
-    [data-theme="dark"] .section-head > a:hover { background: rgba(255, 255, 255, .05); }
-    .reporting { flex: none; color: var(--faint); font-size: .8125rem; font-variant-numeric: tabular-nums; }
+    .reporting { color: var(--faint); font-size: .8125rem; font-variant-numeric: tabular-nums; }
 
-    /* -------------------------------------------------------- components --- */
-    .component-list { overflow: hidden; }
+    /* Rows inside one card, split by hairlines (the panel's table). */
+    .list { border-radius: var(--radius-card); background: var(--surface); }
     .component {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 1rem;
-        padding: .9375rem 1.25rem;
-        border-top: 1px solid var(--divide);
+        padding: .875rem 1.25rem;
+        border-top: 1px solid var(--hairline);
     }
     .component:first-child { border-top: 0; }
     .component-main { min-width: 0; }
-    .component-name {
-        display: flex;
-        align-items: center;
-        gap: .625rem;
-        color: var(--heading);
-        font-size: .9375rem;
-        font-weight: 600;
-    }
-    .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--color-status-unknown); }
-    .component-note { margin: .25rem 0 0; padding-left: 1.25rem; color: var(--muted); font-size: .8125rem; }
-    .component-side { flex: none; display: flex; align-items: center; gap: .625rem; }
-    .component-state { color: var(--muted); font-size: .8125rem; }
+    .component-name { display: flex; align-items: center; gap: .625rem; color: var(--text); font-size: .9375rem; font-weight: 600; }
+    .component-note { margin-top: .25rem; padding-left: 1.125rem; color: var(--muted); font-size: .8125rem; }
+    .component-side { flex: none; display: flex; align-items: center; gap: .75rem; }
+    .component-state { color: var(--muted); font-size: .8125rem; text-align: right; }
 
-    /* Small inline "affected" chip on a component/node row with an active incident. */
+    /* Link on a row that an open incident affects. */
     .flag {
         flex: none;
-        display: inline-flex;
-        align-items: center;
-        gap: .3125rem;
         padding: .125rem .5rem;
-        border-radius: var(--r-badge);
-        background: color-mix(in srgb, var(--color-status-degraded) 18%, transparent);
+        border-radius: var(--radius-control);
+        background: color-mix(in srgb, var(--color-status-degraded) 16%, transparent);
         color: var(--orange-text);
-        font-size: .6875rem;
+        font-size: .75rem;
         font-weight: 600;
         text-decoration: none;
     }
-    .flag i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
-    .flag.impact-major, .flag.impact-critical { background: color-mix(in srgb, var(--color-status-major_outage) 18%, transparent); color: var(--red-text); }
-    .flag.impact-minor, .flag.impact-partial_outage { background: color-mix(in srgb, var(--color-status-partial_outage) 18%, transparent); color: var(--orange-text); }
-    .flag.impact-maintenance { background: color-mix(in srgb, var(--color-status-maintenance) 18%, transparent); color: var(--blue-text); }
+    .flag.impact-major,
+    .flag.impact-critical { background: color-mix(in srgb, var(--color-status-major_outage) 16%, transparent); color: var(--red-text); }
+    .flag.impact-maintenance { background: color-mix(in srgb, var(--color-status-maintenance) 16%, transparent); color: var(--blue-text); }
 
     /* ----------------------------------------------------------- metrics --- */
-    .resource-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
-    .metric { position: relative; overflow: hidden; padding: 1.125rem 1.25rem; }
-    .metric-label {
-        display: block;
-        color: var(--phv2-text-muted);
-        font-size: .75rem;
-        font-weight: 600;
-        letter-spacing: .05em;
-        text-transform: uppercase;
-    }
-    .metric-value {
-        display: block;
-        margin: .25rem 0 .75rem;
-        color: var(--heading);
-        font-size: 1.25rem;
-        font-weight: 700;
-        letter-spacing: -.025em;
-        font-variant-numeric: tabular-nums;
-        font-family: 'JetBrains Mono', monospace;
-    }
+    .resource-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+    .metric { min-width: 0; }
+    .resource-grid[data-global] .metric { padding: 1.125rem 1.25rem; border-radius: var(--radius-card); background: var(--surface); }
+    .metric-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .125rem .75rem; margin-bottom: .5rem; }
+    .metric-label { color: var(--text-nav); font-size: .8125rem; font-weight: 500; }
+    .metric-value { color: var(--text); font-family: var(--font-mono); font-size: .875rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .metric-foot { display: block; margin-top: .375rem; color: var(--faint); font-size: .75rem; font-variant-numeric: tabular-nums; }
 
-    .meter { height: 6px; border-radius: var(--r-pill); background: var(--track); overflow: hidden; }
-    /* status.v4.js sets --p through the CSSOM; style-src 'self' forbids the
-       style="width:…" this used to emit, which left every bar at zero. */
+    .meter { height: 6px; border-radius: var(--radius-pill); background: var(--track); overflow: hidden; }
     .meter > i {
         display: block;
         height: 100%;
         width: calc(var(--p, 0) * 1%);
         border-radius: inherit;
-        background: var(--phv2-accent-bright, #3b82f6);
-        transition: width .8s cubic-bezier(.16, 1, .3, 1), background .3s ease;
+        background: var(--accent-text);
+        transition: width .3s ease;
     }
     .meter.warn > i { background: var(--color-status-degraded); }
     .meter.hot > i { background: var(--color-status-major_outage); }
 
-    .metric small { display: block; margin-top: .5rem; color: var(--faint); font-size: .75rem; font-variant-numeric: tabular-nums; }
-
-    /* Sparkline + hover layer. The crosshair and point marker are HTML over the
+    /* 60-minute graph. The crosshair and point marker are HTML over the
        stretched SVG (a circle inside preserveAspectRatio="none" would squash);
-       status.v4.js writes --x/--y (percent) through the CSSOM. */
-    .spark-wrap { position: relative; margin-top: .5rem; border-radius: 4px; cursor: crosshair; touch-action: pan-y; }
-    .spark-wrap:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-    .spark { display: block; width: 100%; height: 52px; }
-    .spark polyline { fill: none; stroke: var(--phv2-accent-bright, #3b82f6); stroke-width: 1.75; vector-effect: non-scaling-stroke; }
-    .spark .area { fill: var(--accent-soft); stroke: none; }
+       status.v5.js writes --x/--y (percent) through the CSSOM. */
+    .spark-wrap { position: relative; margin-top: .625rem; cursor: crosshair; touch-action: pan-y; }
+    .spark { display: block; width: 100%; height: 48px; overflow: visible; }
+    .spark polyline { fill: none; stroke: var(--accent-text); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+    .spark .area { fill: var(--accent-tint); stroke: none; }
     .spark-x,
     .spark-dot { display: none; position: absolute; pointer-events: none; }
     .spark-x { top: 0; bottom: 0; left: calc(var(--x, 0) * 1%); width: 1px; background: var(--faint); }
     .spark-dot {
         left: calc(var(--x, 0) * 1%);
         top: calc(var(--y, 0) * 1%);
-        width: 10px;
-        height: 10px;
-        margin: -5px 0 0 -5px;
-        border: 2px solid var(--page);
+        width: 9px;
+        height: 9px;
+        margin: -4.5px 0 0 -4.5px;
         border-radius: 50%;
-        background: var(--phv2-accent-bright, #3b82f6);
+        background: var(--accent-text);
     }
     .spark-wrap.is-active .spark-x,
     .spark-wrap.is-active .spark-dot { display: block; }
 
-    /* Floating readout — dropdown elevation, the one popover surface the theme has. */
+    /* The one floating readout on the page. A popover, so it carries its own
+       hairline edge to stand off whatever it floats over. */
     .spark-tip {
         position: fixed;
         top: 0;
         left: 0;
         z-index: 30;
         padding: .375rem .625rem;
-        border: 1px solid var(--card-line);
-        border-radius: var(--r-sm);
-        background: var(--phv2-dropdown, #181a1e);
-        box-shadow: var(--shadow-lg);
+        border: 1px solid var(--hairline);
+        border-radius: var(--radius-control);
+        background: var(--popover);
         pointer-events: none;
         white-space: nowrap;
         transform: translate(calc(var(--tx, 0) * 1px - 50%), calc(var(--ty, 0) * 1px - 100% - 12px));
     }
     .spark-tip.below { transform: translate(calc(var(--tx, 0) * 1px - 50%), calc(var(--ty, 0) * 1px + 12px)); }
-    :root[data-theme="light"] .spark-tip { background: var(--raised); }
-    .spark-tip strong {
-        display: block;
-        color: var(--heading);
-        font-family: 'JetBrains Mono', monospace;
-        font-size: .875rem;
-        font-weight: 700;
-        font-variant-numeric: tabular-nums;
-    }
+    .spark-tip strong { display: block; color: var(--text); font-family: var(--font-mono); font-size: .875rem; font-weight: 700; font-variant-numeric: tabular-nums; }
     .spark-tip span { display: block; color: var(--muted); font-size: .75rem; font-variant-numeric: tabular-nums; }
 
     /* ------------------------------------------------------------- nodes --- */
     .nodes { display: grid; gap: 1rem; }
-    .node { overflow: hidden; }
+    .node { padding: 1.125rem 1.25rem 1.25rem; border-radius: var(--radius-card); background: var(--surface); }
     .node-head {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
-        gap: 1rem;
-        padding: .9375rem 1.25rem;
-        border-bottom: 1px solid var(--divide);
+        gap: .5rem 1rem;
+        margin-bottom: 1rem;
     }
     .node-head-main { min-width: 0; }
-    .node-title {
-        display: flex;
-        align-items: center;
-        gap: .625rem;
-        color: var(--heading);
-        font-size: .9375rem;
-        font-weight: 600;
-    }
-    .node-meta { display: block; margin-top: .125rem; color: var(--faint); font-size: .75rem; }
-    .node-side { flex: none; display: flex; align-items: center; gap: .625rem; }
-    .node .resource-grid { padding: 1rem; }
-
-    /* Nested panels, not nested cards: sunken fill with hairline border. */
-    .node .metric {
-        border-color: var(--phv2-hairline);
-        border-radius: 0.75rem;
-        background: var(--page-deep);
-        box-shadow: none;
-    }
-    [data-theme="dark"] .node .metric {
-        border-color: var(--phv2-hairline);
-        background: var(--phv2-sunken, rgba(15, 17, 22, 0.5));
-    }
-
-    /* Per-node stat strip (latency, uptime, streak). */
-    .node-stats {
-        display: flex;
-        flex-wrap: wrap;
-        gap: .5rem .5rem;
-        padding: 0 1rem 1rem;
-    }
-    .node .node-stats { padding: 0 1rem 1rem; }
-    .stat {
-        display: inline-flex;
-        align-items: baseline;
-        gap: .375rem;
-        padding: .3125rem .625rem;
-        border: 1px solid var(--divide);
-        border-radius: 0.5rem;
-        background: var(--page-deep);
-        font-size: .75rem;
-    }
-    [data-theme="dark"] .stat {
-        background: var(--phv2-sunken, rgba(15, 17, 22, 0.5));
-        border-color: var(--phv2-hairline);
-    }
-    .stat b { color: var(--phv2-accent-bright, #3b82f6); font-weight: 600; font-variant-numeric: tabular-nums; font-family: 'JetBrains Mono', monospace; }
-    .stat span { color: var(--phv2-text-muted); }
+    .node-title { display: flex; align-items: center; gap: .625rem; color: var(--text); font-size: 1rem; font-weight: 600; }
+    .node-meta { display: block; margin-top: .125rem; padding-left: 1.125rem; color: var(--faint); font-size: .75rem; font-variant-numeric: tabular-nums; }
+    .node-side { display: flex; align-items: center; gap: .75rem; }
+    .node .resource-grid { gap: 1.25rem 2rem; }
 
     /* ------------------------------------------------------------ uptime --- */
-    .uptime-list { display: grid; gap: 1rem; }
-    .uptime-row { padding: 1rem 1.25rem; }
-    .uptime-title {
-        display: flex;
-        justify-content: space-between;
-        align-items: baseline;
-        gap: 1rem;
-        margin-bottom: .625rem;
+    /* 7 / 30 / 90-day switch: the panel's tabs (active = raise-2). */
+    .segmented { display: inline-flex; gap: .25rem; padding: .25rem; border-radius: .75rem; background: var(--surface); }
+    .segmented button {
+        min-height: 2rem;
+        padding: .25rem .75rem;
+        border-radius: var(--radius-control);
+        color: var(--text-nav);
+        font-size: .8125rem;
+        font-weight: 500;
+        cursor: pointer;
     }
-    .uptime-title span:first-child { color: var(--heading); font-size: .9375rem; font-weight: 600; }
-    .uptime-windows { display: flex; gap: .375rem; flex-wrap: wrap; }
-    .uptime-windows .stat { padding: .1875rem .5rem; }
-    .bars { display: grid; grid-template-columns: repeat(90, 1fr); gap: 2px; height: 28px; }
-    .bar { border-radius: 2px; background: var(--color-status-operational); }
-    /* Days before monitoring started read as an empty track, not as uptime. */
-    .bar.unknown { background: var(--track); }
-    .uptime-foot { margin: .5rem 0 0; color: var(--faint); font-size: .75rem; }
+    .segmented button:hover,
+    .segmented button[aria-pressed="true"] { background: var(--surface-2); color: var(--text); }
+
+    .uptime-row { padding: 1rem 1.25rem; border-top: 1px solid var(--hairline); }
+    .uptime-row:first-child { border-top: 0; }
+    .uptime-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .125rem 1rem; margin-bottom: .5rem; }
+    .uptime-name { color: var(--text); font-size: .9375rem; font-weight: 600; }
+    .uptime-pct { color: var(--text); font-family: var(--font-mono); font-size: .875rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .uptime-pct small { margin-left: .375rem; color: var(--faint); font-family: var(--font-sans); font-size: .75rem; font-weight: 400; }
+    .bars { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; height: 28px; }
+    .bar { border-radius: 2px; background: var(--track); }
+    .axis { display: flex; justify-content: space-between; margin-top: .375rem; color: var(--faint); font-size: .75rem; }
 
     /* --------------------------------------------------------- incidents --- */
     .incidents { display: grid; gap: 1rem; }
-    .incident { padding: 1.125rem 1.25rem; }
-    .incident.is-active {
-        border-left: 4px solid var(--phv2-accent-bright);
-        background: color-mix(in srgb, var(--phv2-accent-tint) 50%, var(--card));
-    }
-    .incident-head { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
-    .incident h3 { font-size: 1rem; font-weight: 600; letter-spacing: -.015em; }
+    .incident { padding: 1.125rem 1.25rem; border-radius: var(--radius-card); background: var(--surface); }
+    .incident.is-active { background: var(--accent-tint); }
+    .incident-head { display: flex; flex-wrap: wrap; align-items: start; justify-content: space-between; gap: .5rem 1rem; }
+    .incident-head > div { min-width: 0; }
+    .incident h3 { font-size: 1rem; font-weight: 600; }
     .incident-time { display: block; margin-top: .125rem; color: var(--faint); font-size: .75rem; }
-    .incident-badges { flex: none; display: flex; align-items: center; gap: .375rem; }
-    .incident-components { margin: .75rem 0 0; color: var(--muted); font-size: .8125rem; }
+    .incident-badges { display: flex; align-items: center; gap: .375rem; }
+    .incident-components { margin-top: .75rem; color: var(--muted); font-size: .8125rem; }
 
-    /* .fi-badge: rounded-lg, text-xs, semibold. */
+    /* The panel's .fi-badge: rounded-lg, text-xs, semibold, on raise-2. */
     .badge {
-        flex: none;
         padding: .25rem .5rem;
-        border-radius: 0.5rem;
-        background: var(--page-deep);
-        color: var(--muted);
-        font-size: .6875rem;
+        border-radius: var(--radius-control);
+        background: var(--surface-2);
+        color: var(--text);
+        font-size: .75rem;
         font-weight: 600;
         text-transform: capitalize;
     }
-    [data-theme="dark"] .badge { background: var(--phv2-raise-2, rgba(255, 255, 255, 0.1)); color: #f3f4f6; }
-    .badge.major, .badge.critical { color: var(--red-text); }
+    .badge.major,
+    .badge.critical { color: var(--red-text); }
     .badge.minor { color: var(--orange-text); }
     .badge.maintenance { color: var(--blue-text); }
-    .badge.live { background: var(--phv2-accent, #1d4ed8); color: #ffffff; border-radius: 9999px; text-transform: none; }
+    .badge.live { background: var(--accent); color: var(--on-accent); }
 
-    .updates { margin: 1rem 0 0; padding: 0; list-style: none; border-left: 2px solid var(--divide); }
-    .updates li { padding: 0 0 1rem 1rem; }
-    .updates li:last-child { padding-bottom: 0; }
-    .updates strong { display: block; color: var(--heading); font-size: .8125rem; font-weight: 600; }
-    .updates p { margin: .25rem 0 0; color: var(--muted); font-size: .875rem; }
+    .updates { display: grid; gap: .875rem; margin-top: 1rem; }
+    .updates strong { display: block; color: var(--text); font-size: .8125rem; font-weight: 600; }
+    .updates p { margin-top: .125rem; color: var(--muted); font-size: .875rem; }
 
     .empty {
-        padding: 2rem;
-        border: 1px dashed var(--line);
-        border-radius: var(--r-card);
-        color: var(--faint);
+        padding: 1.5rem 1.25rem;
+        border-radius: var(--radius-card);
+        background: var(--surface);
+        color: var(--muted);
         text-align: center;
         font-size: .875rem;
     }
 
     /* ------------------------------------------------------------ footer --- */
-    .footer {
-        margin-top: clamp(2.5rem, 6vw, 4rem);
-        padding: clamp(1.75rem, 4vw, 2.5rem) 0;
-        border-top: 1px solid var(--divide);
-        color: var(--muted);
-        font-size: .8125rem;
-    }
-    .footer .shell { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
-    .footer-links { display: flex; flex-wrap: wrap; gap: 1rem; }
-    .footer a { text-decoration: none; transition: color .18s ease; }
-    .footer a:hover { color: var(--heading); }
+    .footer { padding: 1.75rem 0 2.25rem; border-top: 1px solid var(--hairline); color: var(--muted); font-size: .8125rem; }
+    .footer .shell { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .75rem 1.5rem; }
+    .footer-links { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; }
+    .footer a { text-decoration: none; }
+    .footer a:hover { color: var(--text); }
 
     /* -------------------------------------------------------- responsive --- */
-    @media (max-width: 860px) {
-        .resource-grid { grid-template-columns: 1fr; }
-        .node .resource-grid { grid-template-columns: 1fr; }
-    }
-
-    @media (max-width: 760px) {
-        .page-head { display: block; }
-        .updated { text-align: left; margin-top: 1rem; }
-        .section-head { flex-wrap: wrap; }
+    /* Phones first in spirit: one full-width column below 720px. */
+    @media (max-width: 720px) {
+        main { padding-top: 1.75rem; }
+        .resource-grid,
+        .node .resource-grid { grid-template-columns: minmax(0, 1fr); }
         .bars { gap: 1px; height: 24px; }
-        .nav-actions > a { display: none; }
     }
 
-    @media (max-width: 520px) {
-        .shell { width: min(100% - 1.5rem, 1100px); }
-        .nav { min-height: 60px; }
+    @media (max-width: 480px) {
+        .brand .suffix { display: none; }
         .overall { align-items: flex-start; flex-wrap: wrap; }
-        .component { align-items: flex-start; }
-        .component-state { text-align: right; }
-        .bars { grid-template-columns: repeat(45, 1fr); height: 20px; }
+        .overall-dot { margin-top: .375rem; }
+        .component,
+        .node,
+        .uptime-row,
+        .incident { padding-inline: 1rem; }
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
-        animation-duration: .001ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: .001ms !important;
-    }
+    *, *::before, *::after { transition-duration: .001ms !important; }
+    .button:active { transform: none; }
 }

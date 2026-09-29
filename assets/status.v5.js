@@ -1,10 +1,10 @@
 /* ==========================================================================
-   status.plugged.host — v4
+   status.plugged.host — v5
 
-   The vhost CSP is style-src 'self' with no 'unsafe-inline', so nothing here
-   may emit an inline style attribute. Meter fills ship as data-p on the .meter
+   The CSP is style-src 'self' with no 'unsafe-inline', so nothing here may
+   emit an inline style attribute. Meter fills ship as data-p on the .meter
    and are applied afterwards through the CSSOM (applyMeters + @property --p),
-   which CSP does not restrict. Every interpolated value is escapeHtml'd.
+   which the CSP does not restrict. Every interpolated value is escapeHtml'd.
    ========================================================================== */
 
 'use strict';
@@ -38,7 +38,6 @@ button?.addEventListener('click', () => {
     setTheme(next);
 });
 
-
 /* ------------------------------------------------------------ helpers ---- */
 
 const labels = {
@@ -63,20 +62,41 @@ const STALE_AFTER = 180000;
 const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
 
-const number = value => new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(Number(value || 0));
+const number = (value, digits = 2) =>
+    new Intl.NumberFormat(undefined, { maximumFractionDigits: digits }).format(Number(value || 0));
+
+/* Human precision: two decimals below 1, one below 100, none above. */
+const short = value => {
+    const n = Math.abs(Number(value || 0));
+    return number(value, n < 1 ? 2 : n < 100 ? 1 : 0);
+};
 
 /* Storage is 1000-based, the way disks are sold (and PANEL_USE_BINARY_PREFIX=false
    in the panel). Memory is 1024-based: RAM is sized in powers of two, and wings
    reports the kernel's MemTotal, so a 96 GB box reads ~94 GiB usable here rather
    than "101 GB" from dividing binary bytes by 1000. */
-const bytes = (value, binary = false) => {
+function unitFor(value, binary) {
     const n = Number(value || 0);
-    if (!n) return '0 B';
     const base = binary ? 1024 : 1000;
     const units = binary ? ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'] : ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
-    const i = Math.min(Math.floor(Math.log(n) / Math.log(base)), units.length - 1);
-    return `${number(n / base ** i)} ${units[i]}`;
+    const i = n > 0 ? Math.min(Math.floor(Math.log(n) / Math.log(base)), units.length - 1) : 0;
+    return { divisor: base ** i, unit: units[i] };
+}
+
+const bytes = (value, binary = false) => {
+    const { divisor, unit } = unitFor(value, binary);
+    return `${short(Number(value || 0) / divisor)} ${unit}`;
 };
+
+/* "67.3 / 94.3 GiB": both sides in the unit of the total. */
+const bytePair = (used, total, binary) => {
+    const { divisor, unit } = unitFor(total || used, binary);
+    return `${short(Number(used || 0) / divisor)} / ${short(Number(total || 0) / divisor)} ${unit}`;
+};
+
+/* CPU is exported in percent, 100 per thread. */
+const threads = value => Number(value || 0) / 100;
+const threadWord = total => (threads(total) === 1 ? 'thread' : 'threads');
 
 const clock = value => new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 
@@ -84,15 +104,15 @@ const time = value => {
     const date = new Date(value);
     return Number.isNaN(date.valueOf())
         ? 'Unknown'
-        : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'medium' }).format(date);
+        : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 };
 
 const relative = value => {
     const seconds = Math.max(0, (Date.now() - new Date(value).valueOf()) / 1000);
     if (!Number.isFinite(seconds)) return 'unknown';
     if (seconds < 60) return `${Math.round(seconds)}s ago`;
-    if (seconds < 3600) return `${Math.round(seconds / 60)}m ago`;
-    return `${Math.round(seconds / 3600)}h ago`;
+    if (seconds < 3600) return `${Math.round(seconds / 60)} min ago`;
+    return `${Math.round(seconds / 3600)} h ago`;
 };
 
 const pct = (used, total) => total > 0 ? Math.min(100, Math.max(0, used / total * 100)) : 0;
@@ -121,58 +141,23 @@ function uptimeWindow(days, span) {
     return { percent, recorded: recorded.length };
 }
 
-/* Consecutive operational days counting back from the most recent entry. */
-function currentStreak(days) {
-    let streak = 0;
-    for (let i = days.length - 1; i >= 0; i--) {
-        const status = days[i] && days[i].status;
-        if (status === 'operational') streak++;
-        else if (status && status !== 'unknown') break;
-        else break;
-    }
-    return streak;
-}
-
-function uptimeStats(days) {
-    const list = Array.isArray(days) ? days : [];
-    return {
-        d7: uptimeWindow(list, 7),
-        d30: uptimeWindow(list, 30),
-        d90: uptimeWindow(list, 90),
-        streak: currentStreak(list),
-    };
-}
-
-function windowStat(label, window) {
-    if (!window) return `<span class="stat"><b>—</b><span>${escapeHtml(label)}</span></span>`;
-    return `<span class="stat"><b>${number(window.percent)}%</b><span>${escapeHtml(label)}</span></span>`;
-}
-
-function uptimeWindowsHtml(stats) {
-    return `<div class="uptime-windows">`
-        + windowStat('7d', stats.d7)
-        + windowStat('30d', stats.d30)
-        + windowStat('90d', stats.d90)
-        + (stats.streak > 0 ? `<span class="stat"><b>${stats.streak}</b><span>day streak</span></span>` : '')
-        + `</div>`;
-}
-
 /* ------------------------------------------------------------- meters ---- */
 
 /* data-p is a plain attribute, so it survives innerHTML under a strict CSP.
    The width itself is applied by applyMeters() once the node is in the DOM. */
 function metric(label, used, total, kind, series = null) {
     const percentage = pct(used, total);
-    const binary = kind === 'memory';
-    const value = kind === 'cpu' ? `${number(used)}% / ${number(total)}%` : `${bytes(used, binary)} / ${bytes(total, binary)}`;
-    return `<article class="metric">`
-        + `<span class="metric-label">${escapeHtml(label)}</span>`
-        + `<strong class="metric-value">${value}</strong>`
-        + `<div class="meter" data-p="${percentage.toFixed(2)}" role="progressbar" aria-label="${escapeHtml(label)} utilization"`
+    const value = kind === 'cpu'
+        ? `${short(threads(used))} / ${short(threads(total))} ${threadWord(total)}`
+        : bytePair(used, total, kind === 'memory');
+    return `<div class="metric">`
+        + `<div class="metric-head"><span class="metric-label">${escapeHtml(label)}</span>`
+        + `<strong class="metric-value">${escapeHtml(value)}</strong></div>`
+        + `<div class="meter" data-p="${percentage.toFixed(2)}" role="progressbar" aria-label="${escapeHtml(label)} in use"`
         + ` aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(percentage)}"><i></i></div>`
+        + `<span class="metric-foot">${number(percentage, 1)}% used</span>`
         + (series ? sparkline(label, kind, series, total) : '')
-        + `<small>${number(percentage)}% utilized</small>`
-        + `</article>`;
+        + `</div>`;
 }
 
 function applyMeters(container) {
@@ -239,17 +224,17 @@ function sparkline(label, kind, series, total) {
         + `<i class="spark-x"></i><i class="spark-dot"></i></div>`;
 }
 
-/* Value leads (utilization %), the time follows; memory also names the bytes. */
+/* Value leads (share of capacity), then the amount and the time. */
 function readout(spark, point) {
-    const detail = [
-        spark.kind === 'memory' ? bytes(point.v, true) : null,
-        point.t != null ? clock(point.t) : null,
-    ].filter(Boolean).join(' · ');
-    return { value: `${number(point.pct)}%`, detail };
+    const amount = spark.kind === 'memory'
+        ? bytes(point.v, true)
+        : spark.kind === 'cpu' ? `${short(threads(point.v))} threads` : null;
+    const detail = [amount, point.t != null ? clock(point.t) : null].filter(Boolean).join(' · ');
+    return { value: `${number(point.pct, 1)}%`, detail };
 }
 
-/* One floating readout for the page. It lives on <body> because .metric clips
-   its overflow, and it is positioned through the CSSOM (--tx/--ty) for the CSP. */
+/* One floating readout for the page, on <body> so no card can clip it. It is
+   positioned through the CSSOM (--tx/--ty) for the CSP. */
 const tip = document.createElement('div');
 tip.className = 'spark-tip';
 tip.hidden = true;
@@ -353,9 +338,8 @@ function flagFor(label, byLabel) {
     const incident = byLabel.get(key(label));
     if (!incident) return '';
     const impact = escapeHtml(incident.impact || 'minor');
-    const state = escapeHtml(incidentStatusLabels[incident.status] || incident.status || 'active');
-    return `<a class="flag impact-${impact}" href="#incidents" title="${escapeHtml(incident.title || 'Active incident')}">`
-        + `<i></i>${state}</a>`;
+    const state = escapeHtml(incidentStatusLabels[incident.status] || incident.status || 'Active');
+    return `<a class="flag impact-${impact}" href="#incidents" title="${escapeHtml(incident.title || 'Active incident')}">${state}</a>`;
 }
 
 /* ------------------------------------------------------------ renders ---- */
@@ -366,9 +350,14 @@ function renderCurrent(data, history, incidentIndex) {
     const generated = new Date(data.generated_at);
     const stale = !Number.isFinite(generated.valueOf()) || Date.now() - generated.valueOf() > STALE_AFTER;
 
-    document.querySelector('[data-updated]').textContent = data.generated_at
-        ? `${time(data.generated_at)} (${relative(data.generated_at)})`
-        : 'Waiting for data';
+    const updated = document.querySelector('[data-updated]');
+    if (data.generated_at) {
+        updated.textContent = relative(data.generated_at);
+        updated.setAttribute('datetime', data.generated_at);
+        updated.title = time(data.generated_at);
+    } else {
+        updated.textContent = 'waiting for data';
+    }
 
     const state = stale ? 'unknown' : (data.overall?.status || 'unknown');
     const overall = document.querySelector('[data-overall]');
@@ -376,27 +365,21 @@ function renderCurrent(data, history, incidentIndex) {
     overall.querySelector('strong').textContent = stale
         ? 'Monitoring data delayed'
         : (data.overall?.label || labels[state] || labels.unknown);
-    overall.querySelector('span').textContent = stale
-        ? 'The last update is over three minutes old. Values below may be stale.'
+    overall.querySelector('.overall-body span').textContent = stale
+        ? 'The last update is over three minutes old, so the values below may be out of date.'
         : (data.overall?.message || 'All monitored systems are reporting normally.');
 
-    /* Active-incident affordance on the banner. */
+    /* Link to the incident list while any incident is open. */
     const flag = overall.querySelector('[data-overall-flag]');
     if (flag) {
         const count = incidentIndex.active.length;
-        if (count > 0) {
-            flag.hidden = false;
-            flag.innerHTML = `<i></i>${plural(count, 'active incident')}`;
-        } else {
-            flag.hidden = true;
-            flag.textContent = '';
-        }
+        flag.hidden = count === 0;
+        flag.textContent = count > 0 ? plural(count, 'open incident') : '';
     }
 
-    /* Node labels drive de-duplication: components[] often repeats each node,
-       so the Services list shows only entries that are not a node row. */
+    /* Node labels drive de-duplication: components[] also lists each node, so
+       the Services list shows only entries that are not a node. */
     const nodeLabels = new Set((data.nodes || []).map(n => key(n.display_name ?? n.label)));
-    const uptimeByLabel = new Map((history.uptime || []).map(u => [key(u.label), u]));
 
     const services = (data.components || []).filter(item => !nodeLabels.has(key(item.label)));
     const components = document.querySelector('[data-components]');
@@ -429,26 +412,19 @@ function renderCurrent(data, history, incidentIndex) {
     nodes.innerHTML = (data.nodes || []).map(node => {
         const name = node.display_name ?? node.label;
         const series = recent.find(item => key(item.label) === key(name) || key(item.label) === key(node.label)) || {};
-        const uptime = uptimeByLabel.get(key(name)) || uptimeByLabel.get(key(node.label));
-        const stats = uptime ? uptimeStats(uptime.days) : null;
 
-        /* Latency: prefer node.latency_ms, fall back to metrics.response_time_ms.
-           Render the row only when a value is actually present. */
+        /* Latency: prefer node.latency_ms, fall back to metrics.response_time_ms. */
         const latency = node.latency_ms != null
             ? node.latency_ms
             : (node.metrics?.response_time_ms != null ? node.metrics.response_time_ms : null);
-
-        const statChips = [];
-        if (latency != null) statChips.push(`<span class="stat"><b>${number(latency)} ms</b><span>latency</span></span>`);
-        if (stats?.d30) statChips.push(`<span class="stat"><b>${number(stats.d30.percent)}%</b><span>30d uptime</span></span>`);
-        if (stats?.d90) statChips.push(`<span class="stat"><b>${number(stats.d90.percent)}%</b><span>90d uptime</span></span>`);
-        if (stats?.streak > 0) statChips.push(`<span class="stat"><b>${stats.streak}</b><span>day streak</span></span>`);
+        const meta = [
+            node.last_reported_at ? `Reported ${relative(node.last_reported_at)}` : 'No successful report',
+            latency != null ? `${number(latency, 0)} ms latency` : null,
+        ].filter(Boolean).join(' · ');
 
         return `<article class="node"><header class="node-head"><div class="node-head-main">`
-            + `<span class="node-title"><i class="dot ${escapeHtml(node.status)}"></i>${escapeHtml(name)}</span>`
-            + `<span class="node-meta">${node.last_reported_at
-                ? `Last reported ${escapeHtml(relative(node.last_reported_at))}`
-                : 'No successful report'}</span></div>`
+            + `<h3 class="node-title"><i class="dot ${escapeHtml(node.status)}"></i>${escapeHtml(name)}</h3>`
+            + `<span class="node-meta">${escapeHtml(meta)}</span></div>`
             + `<div class="node-side">`
             + flagFor(name, incidentIndex.byLabel)
             + `<span class="component-state">${escapeHtml(labels[node.status] || node.status)}</span>`
@@ -457,39 +433,53 @@ function renderCurrent(data, history, incidentIndex) {
             + metric('CPU', node.metrics?.cpu_used, node.metrics?.cpu_total, 'cpu', { values: series.cpu, times: series.times, end: historyEnd })
             + metric('Memory', node.metrics?.memory_used, node.metrics?.memory_total, 'memory', { values: series.memory, times: series.times, end: historyEnd })
             + metric('Storage', node.metrics?.storage_used, node.metrics?.storage_total, 'storage')
-            + `</div>`
-            + (statChips.length ? `<div class="node-stats">${statChips.join('')}</div>` : '')
-            + `</article>`;
+            + `</div></article>`;
     }).join('') || '<div class="empty">No node data has been published yet.</div>';
     applyMeters(nodes);
     bindSparks(nodes);
 }
 
+/* 7 / 30 / 90-day switch. The last history payload is kept so switching
+   re-renders without a fetch. */
+let uptimeSpan = 90;
+let lastHistory = null;
+
 function renderHistory(data) {
-    document.querySelector('[data-uptime]').innerHTML = (data.uptime || []).map(item => {
-        const days = item.days || [];
-        /* The export always pads to 90 entries, filling days from before the
-           first collection run with 'unknown'. Saying "99.8% over 90 days"
-           when only a handful were observed would overstate the record, so
-           the footnote reports how many days actually carry a check. */
-        const recorded = days.filter(day => day && day.status && day.status !== 'unknown').length;
-        const blank = days.length - recorded;
-        const stats = uptimeStats(days);
+    lastHistory = data;
+    const host = document.querySelector('[data-uptime]');
+    const rows = data.uptime || [];
+    host.classList.toggle('list', rows.length > 0);
+    host.innerHTML = rows.map(item => {
+        const days = (item.days || []).slice(-uptimeSpan);
+        const stats = uptimeWindow(item.days || [], uptimeSpan);
+        /* Saying "99.8% over 90 days" when only a handful were observed would
+           overstate the record, so a short record says how many days it has. */
+        const figure = stats
+            ? `${number(stats.percent, 2)}%`
+              + (stats.recorded < days.length ? `<small>over ${plural(stats.recorded, 'recorded day')}</small>` : '')
+            : 'No data yet';
         const bars = days.map(day =>
             `<i class="bar ${escapeHtml(day?.status || 'unknown')}" title="${escapeHtml(day?.date || 'No data')}: `
             + `${escapeHtml(labels[day?.status] || 'No data')}"></i>`
         ).join('');
 
-        return `<article class="uptime-row"><div class="uptime-title">`
-            + `<span>${escapeHtml(item.label)}</span>`
-            + `<span>${number(item.uptime_percent)}% uptime</span></div>`
-            + uptimeWindowsHtml(stats)
-            + `<div class="bars" aria-label="Daily uptime for ${escapeHtml(item.label)}">${bars}</div>`
-            + `<p class="uptime-foot">${plural(recorded, 'day')} of recorded checks`
-            + (blank > 0 ? ` · ${plural(blank, 'day')} before monitoring started` : '')
-            + `</p></article>`;
-    }).join('') || '<div class="empty">Uptime history will build after monitoring begins.</div>';
+        return `<div class="uptime-row"><div class="uptime-head">`
+            + `<span class="uptime-name">${escapeHtml(item.label)}</span>`
+            + `<span class="uptime-pct">${figure}</span></div>`
+            + `<div class="bars" role="img" aria-label="Daily status of ${escapeHtml(item.label)} over the last ${plural(days.length, 'day')}">${bars}</div>`
+            + `<div class="axis" aria-hidden="true"><span>${plural(days.length, 'day')} ago</span><span>Today</span></div>`
+            + `</div>`;
+    }).join('') || '<div class="empty">Uptime history builds up once monitoring begins.</div>';
 }
+
+document.querySelectorAll('[data-window-switch] [data-window]').forEach(control => {
+    control.addEventListener('click', () => {
+        uptimeSpan = Number(control.dataset.window) || 90;
+        document.querySelectorAll('[data-window-switch] [data-window]').forEach(other =>
+            other.setAttribute('aria-pressed', String(other === control)));
+        if (lastHistory) renderHistory(lastHistory);
+    });
+});
 
 function renderIncidents(data) {
     document.querySelector('[data-incidents]').innerHTML = (data.incidents || []).map(incident => {
@@ -548,8 +538,8 @@ async function load() {
     let incidents = null;
     const backendOrigin = getDataOrigin();
 
-    // 1. Try local relative fetch (/data/*.json). On Cloudflare the Worker
-    //    (worker.js) proxies it to the panel, so the "local" path is live data.
+    // 1. Same-origin /data/*.json. On Cloudflare the Worker (worker.js)
+    //    proxies it to the panel, so the "local" path is live data.
     try {
         const [c, h, i] = await fetchStatusFiles('');
         if (c) {
@@ -558,11 +548,10 @@ async function load() {
             incidents = i;
         }
     } catch {
-        // Local fetch failed (e.g. static host without backend or network issue).
+        // Proxy unavailable (static host without the Worker, or the panel refused it).
     }
 
-    // 2. If we have no data, or the data we got is stale (> 3 minutes), fetch
-    //    live telemetry directly from the backend origin.
+    // 2. No data, or stale data (> 3 minutes): fetch the panel export directly.
     if (!current || !isDataFresh(current)) {
         try {
             const [rc, rh, ri] = await fetchStatusFiles(backendOrigin);
@@ -572,16 +561,15 @@ async function load() {
                 incidents = ri;
             }
         } catch {
-            // Backend origin fetch failed; if we already have local data, proceed with it.
+            // The panel origin failed too; carry on with whatever the proxy gave.
         }
     }
 
-    // If still no data after all attempts, display the unavailable error state.
     if (!current) {
         const overall = document.querySelector('[data-overall]');
         overall.className = 'overall status-unknown';
         overall.querySelector('strong').textContent = 'Monitoring data unavailable';
-        overall.querySelector('span').textContent = 'The status feed could not be loaded. Please try again shortly.';
+        overall.querySelector('.overall-body span').textContent = 'The status feed could not be loaded. Try again in a moment.';
         return;
     }
 
@@ -589,6 +577,10 @@ async function load() {
     renderCurrent(current, history || {}, incidentIndex);
     renderHistory(history || {});
     renderIncidents(incidents || {});
+}
+
+for (const el of document.querySelectorAll('[data-year]')) {
+    el.textContent = String(new Date().getFullYear());
 }
 
 load();

@@ -1,19 +1,121 @@
 <!doctype html>
 <html lang="en" data-theme="dark">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Live infrastructure status and resource usage for plugged.host."><meta name="theme-color" content="#0b0d10"><meta name="status-origin" content="https://panel.plugged.host"><title>System Status — plugged.host</title><link rel="icon" href="/assets/plugged.host.png" type="image/png"><link rel="alternate" type="application/rss+xml" title="plugged.host incidents" href="/feed.xml"><link rel="preload" href="/assets/fonts/space-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/assets/fonts/jetbrains-mono-latin.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/assets/status.v4.css"><script src="/assets/status.v4.js" defer></script></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Live status, resource usage, uptime and incident history for plugged.host.">
+  <meta name="theme-color" content="#0b0d10">
+  <meta name="status-origin" content="https://panel.plugged.host">
+  <title>System status — plugged.host</title>
+  <link rel="icon" href="/assets/plugged.host.png" type="image/png">
+  <link rel="alternate" type="application/rss+xml" title="plugged.host incidents" href="/feed.xml">
+  <link rel="preload" href="/assets/fonts/space-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/assets/fonts/jetbrains-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/assets/status.v5.css">
+  <script src="/assets/status.v5.js" defer></script>
+</head>
 <body>
   <a class="skip" href="#main">Skip to status</a>
-  <div class="bg-grid" aria-hidden="true"></div>
-  <header class="topbar"><nav class="nav shell" aria-label="Primary"><a class="brand" href="https://plugged.host"><img src="/assets/plugged.host.png" alt=""><span>plugged<em>.</em>host <span class="sep">/</span> status</span></a><div class="nav-actions"><a href="https://plugged.host">Home</a><a href="/feed.xml">RSS</a><button class="theme" type="button" data-theme-toggle aria-label="Switch theme"><svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4 8.5 8.5 0 1 0 20 15.2Z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg></button><a class="button" href="https://panel.plugged.host">Open panel</a></div></nav></header>
+
+  <header class="topbar">
+    <nav class="nav shell" aria-label="Primary">
+      <a class="brand" href="https://plugged.host" aria-label="plugged.host home">
+        <img src="/assets/plugged.host.png" alt="" width="32" height="32">
+        <span>plugged<em>.</em>host <span class="suffix">/ status</span></span>
+      </a>
+      <div class="nav-actions">
+        <button class="icon-button" type="button" data-theme-toggle aria-label="Switch theme" title="Switch theme">
+          <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4 8.5 8.5 0 1 0 20 15.2Z"/></svg>
+          <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
+        </button>
+        <a class="button primary small" href="https://panel.plugged.host">Open panel</a>
+      </div>
+    </nav>
+  </header>
+
   <main id="main" class="shell">
-    <header class="page-head"><div><p class="eyebrow">Infrastructure</p><h1>System status</h1></div><div class="updated">Last updated<time data-updated>Waiting for data</time></div></header>
-    <div class="overall status-unknown" data-overall role="status" aria-live="polite"><i class="status-mark" aria-hidden="true"></i><div class="overall-body"><strong>Monitoring is starting</strong><span>Live data will appear after the first collection run.</span></div><a class="overall-flag" href="#incidents" data-overall-flag hidden></a></div>
-    <section class="section" aria-labelledby="services-title"><div class="section-head"><div><h2 id="services-title">Services</h2><p class="section-copy">Reachability and health of the website, panel, and platform services.</p></div></div><div class="component-list" data-components><div class="component"><div class="component-main"><span class="component-name"><i class="dot unknown"></i>Monitoring</span></div><div class="component-side"><span class="component-state">Waiting</span></div></div></div></section>
-    <section class="section" aria-labelledby="resources-title"><div class="section-head"><div><h2 id="resources-title">Combined resources</h2><p class="section-copy">Live usage across status-enabled nodes.</p></div><span class="reporting" data-reporting>0 of 0 nodes reporting</span></div><div class="resource-grid" data-global></div></section>
-    <section class="section" aria-labelledby="nodes-title"><div class="section-head"><div><h2 id="nodes-title">Nodes</h2><p class="section-copy">Per-node usage, latency, and uptime. Network details stay private.</p></div></div><div class="nodes" data-nodes><div class="empty">No node data has been published yet.</div></div></section>
-    <section class="section" aria-labelledby="uptime-title"><div class="section-head"><div><h2 id="uptime-title">Daily uptime</h2><p class="section-copy">One bar per day, most recent on the right. Rolling windows are computed from recorded checks; days before monitoring started are left blank.</p></div></div><div class="uptime-list" data-uptime><div class="empty">Uptime history will build after monitoring begins.</div></div></section>
-    <section class="section" id="incidents" aria-labelledby="incidents-title"><div class="section-head"><div><h2 id="incidents-title">Incident history</h2><p class="section-copy">Maintenance and operational updates from the team.</p></div><a href="/feed.xml">RSS feed</a></div><div class="incidents" data-incidents><div class="empty">No incidents reported.</div></div></section>
+    <header class="page-head">
+      <h1>System status</h1>
+      <p class="updated">Updated <time data-updated>waiting for data</time></p>
+    </header>
+
+    <div class="overall status-unknown" data-overall role="status" aria-live="polite">
+      <i class="overall-dot" aria-hidden="true"></i>
+      <div class="overall-body"><strong>Monitoring is starting</strong><span>Live data appears after the first collection run.</span></div>
+      <a class="overall-flag" href="#incidents" data-overall-flag hidden></a>
+    </div>
+
+    <section class="section" aria-labelledby="services-title">
+      <div class="section-head">
+        <div>
+          <h2 id="services-title">Services</h2>
+          <p class="section-copy">Whether the website and the panel are reachable.</p>
+        </div>
+      </div>
+      <div class="list" data-components>
+        <div class="component"><div class="component-main"><span class="component-name"><i class="dot unknown"></i>Monitoring</span></div><div class="component-side"><span class="component-state">Waiting</span></div></div>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="resources-title">
+      <div class="section-head">
+        <div>
+          <h2 id="resources-title">Combined resources</h2>
+          <p class="section-copy">Current usage across every node that reports to the status page.</p>
+        </div>
+        <span class="reporting" data-reporting>0 of 0 nodes reporting</span>
+      </div>
+      <div class="resource-grid" data-global></div>
+    </section>
+
+    <section class="section" aria-labelledby="nodes-title">
+      <div class="section-head">
+        <div>
+          <h2 id="nodes-title">Nodes</h2>
+          <p class="section-copy">Usage per node, with the last 60 minutes of CPU and memory. Point at a graph, or focus it and use the arrow keys, to read a minute.</p>
+        </div>
+      </div>
+      <div class="nodes" data-nodes><div class="empty">No node data has been published yet.</div></div>
+    </section>
+
+    <section class="section" aria-labelledby="uptime-title">
+      <div class="section-head">
+        <div>
+          <h2 id="uptime-title">Daily uptime</h2>
+          <p class="section-copy">One bar per day, today on the right. Percentages count recorded checks only; days before monitoring started stay blank.</p>
+        </div>
+        <div class="segmented" role="group" aria-label="Uptime window" data-window-switch>
+          <button type="button" data-window="7" aria-pressed="false">7 days</button>
+          <button type="button" data-window="30" aria-pressed="false">30 days</button>
+          <button type="button" data-window="90" aria-pressed="true">90 days</button>
+        </div>
+      </div>
+      <div data-uptime><div class="empty">Uptime history builds up once monitoring begins.</div></div>
+    </section>
+
+    <section class="section" id="incidents" aria-labelledby="incidents-title">
+      <div class="section-head">
+        <div>
+          <h2 id="incidents-title">Incident history</h2>
+          <p class="section-copy">Outages, maintenance and the updates posted while they were open.</p>
+        </div>
+        <a class="section-link" href="/feed.xml">RSS feed</a>
+      </div>
+      <div class="incidents" data-incidents><div class="empty">No incidents reported.</div></div>
+    </section>
   </main>
-  <footer class="footer"><div class="shell"><span>Powered by plugged.host telemetry</span><nav class="footer-links" aria-label="Footer"><a href="https://plugged.host">Home</a><a href="https://plugged.host/terms">Terms</a><a href="https://plugged.host/privacy">Privacy</a><a href="https://discord.gg/RuzP2yaRrN">Discord</a></nav></div></footer>
+
+  <footer class="footer">
+    <div class="shell">
+      <span>© <span data-year>2026</span> plugged.host · run by noprofit.space</span>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="https://plugged.host">plugged.host</a>
+        <a href="/feed.xml">RSS</a>
+        <a href="https://noprofit.space/terms">Terms</a>
+        <a href="https://noprofit.space/privacy">Privacy</a>
+        <a href="https://discord.gg/RuzP2yaRrN">Discord</a>
+      </nav>
+    </div>
+  </footer>
 </body>
 </html>
