@@ -9,7 +9,5 @@ package.json
 package-lock.json
 wrangler.jsonc
 worker.js
-netlify.toml
-vercel.json
 assets/*.src.css
 README.md
