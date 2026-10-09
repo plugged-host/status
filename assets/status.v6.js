@@ -344,7 +344,16 @@ function flagFor(label, byLabel) {
 
 /* ------------------------------------------------------------ renders ---- */
 
+// The release the panel runs (current.json "release", e.g. v2.1.0.43eb9c9), after the copyright.
+function showRelease(release) {
+    const el = document.querySelector('[data-release]');
+    if (!el || typeof release !== 'string' || !/^v\d+\.\d+\.\d+(\.[0-9a-f]{4,40})?$/.test(release)) return;
+    el.textContent = ` · ${release}`;
+    el.hidden = false;
+}
+
 function renderCurrent(data, history, incidentIndex) {
+    showRelease(data.release);
     hidePoint();
     sparks.clear();
     const generated = new Date(data.generated_at);
