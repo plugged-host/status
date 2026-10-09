@@ -210,6 +210,8 @@ export function composeCurrent({ now, panel, panelFresh, verdicts, targetLabels,
     return {
         schema_version: 1,
         generated_at: iso(now),
+        /* The panel's release (v2.2.0.<commit>), from its last export even when stale. */
+        release: typeof panel?.release === 'string' ? panel.release : null,
         overall: overall(components, nodeRows.length, panelFresh),
         components,
         global,
