@@ -1,3 +1,3 @@
 # Static-asset redirects (Cloudflare Workers assets). /data/* and /feed.xml are
-# proxied to the panel by worker.js — _redirects cannot proxy to another host.
+# answered by worker.js (the status monitor), not by assets.
 /rss  /feed.xml  301
