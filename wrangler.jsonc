@@ -1,7 +1,10 @@
 // Cloudflare Workers + static assets. No build step: the repo root is the asset
 // directory (.assetsignore keeps tooling and sources out of the upload), and
-// worker.js only runs for the panel-data proxy routes and unmatched paths.
+// worker.js runs for /data/*, /feed.xml, unmatched paths and the cron.
 // "name" must match the Worker's name in the Cloudflare dashboard.
+//
+// Everything below is created by `wrangler deploy` itself (cron, Durable
+// Object class via the migration, service binding); no dashboard step.
 {
     "name": "status-plugged",
     "main": "worker.js",
@@ -10,6 +13,29 @@
         "directory": ".",
         "binding": "ASSETS",
         "run_worker_first": ["/data/*", "/feed.xml"]
+    },
+    // The out-of-band prober: one tick a minute (monitor/monitor.js).
+    "triggers": {
+        "crons": ["* * * * *"]
+    },
+    // SQLite-backed, so it is available on the Workers Free plan.
+    "durable_objects": {
+        "bindings": [{ "name": "MONITOR", "class_name": "StatusMonitor" }]
+    },
+    "migrations": [{ "tag": "v1", "new_sqlite_classes": ["StatusMonitor"] }],
+    // The website is the site-plugged Worker on the same zone. Its public URL
+    // is probed first; this binding only re-checks a failed probe (a same-zone
+    // fetch() cannot reach a Worker on a route, only one on a Custom Domain).
+    "services": [{ "binding": "SITE", "service": "site-plugged" }],
+    "vars": {
+        // Base of the panel's status export (/data/*.json, /data/targets.json).
+        "PANEL_URL": "https://panel.plugged.host",
+        "PANEL_HEALTH_URL": "https://panel.plugged.host/up",
+        "SITE_URL": "https://plugged.host",
+        // The <link> in feed.xml, as STATUS_RSS_BASE_URL on the panel.
+        "RSS_BASE_URL": "https://status.plugged.host",
+        // Where the Durable Object is created (next to the panel and nodes).
+        "MONITOR_LOCATION": "weur"
     },
     "observability": {
         "enabled": true
