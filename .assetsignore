@@ -3,6 +3,7 @@
 .git
 .gitignore
 .assetsignore
+.node-version
 .wrangler
 node_modules
 package.json
