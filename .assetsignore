@@ -12,4 +12,5 @@ wrangler.jsonc
 worker.js
 assets/*.src.css
 README.md
+SECURITY.md
 monitor/
