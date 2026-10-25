@@ -193,6 +193,9 @@ export function composeCurrent({ now, panel, panelFresh, verdicts, targetLabels,
                 /* TCP connect time from this Worker's vantage point. */
                 latency_ms: verdict?.reachable && Number.isFinite(verdict.ms) ? verdict.ms : null,
                 metrics: null,
+                /* The hardware does not change while the panel is away. */
+                cpu_model: nodeOf.get(key(row.label))?.cpu_model ?? null,
+                memory_type: nodeOf.get(key(row.label))?.memory_type ?? null,
             };
         });
         global = {

@@ -430,9 +430,12 @@ function renderCurrent(data, history, incidentIndex) {
             node.last_reported_at ? `Reported ${relative(node.last_reported_at)}` : 'No successful report',
             latency != null ? `${number(latency, 0)} ms latency` : null,
         ].filter(Boolean).join(' · ');
+        /* The hardware an admin named in the panel's node form, when there is any. */
+        const hardware = [node.cpu_model, node.memory_type].filter(Boolean).join(' · ');
 
         return `<article class="node"><header class="node-head"><div class="node-head-main">`
             + `<h3 class="node-title"><i class="dot ${escapeHtml(node.status)}"></i>${escapeHtml(name)}</h3>`
+            + (hardware ? `<span class="node-meta">${escapeHtml(hardware)}</span>` : '')
             + `<span class="node-meta">${escapeHtml(meta)}</span></div>`
             + `<div class="node-side">`
             + flagFor(name, incidentIndex.byLabel)
