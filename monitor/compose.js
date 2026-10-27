@@ -108,7 +108,9 @@ function overall(components, nodeCount, panelFresh) {
     const status = overallStatus(components, nodeCount);
     let message = status === 'operational'
         ? 'All monitored systems are reporting normally.'
-        : 'One or more monitored systems require attention.';
+        : status === 'maintenance'
+            ? 'Planned maintenance is in progress.'
+            : 'One or more monitored systems require attention.';
     if (!panelFresh) message += ' Node resource figures are unavailable while the panel is not reporting.';
     return { status, label: OVERALL_LABEL[status] || 'Status unknown', message };
 }
@@ -302,7 +304,9 @@ export function composeHistory({ now, panel, panelFresh, labels, ownDays }) {
 /* Folds one tick's verdicts into a day record: [total, operational, worst]. */
 export function countCheck(record, status) {
     const [total, operational, worst] = record || [0, 0, null];
-    return [total + 1, operational + (status === 'operational' ? 1 : 0), worst === null || priority(status) > priority(worst) ? status : worst];
+    /* planned maintenance does not count against uptime */
+    const up = status === 'operational' || status === 'maintenance';
+    return [total + 1, operational + (up ? 1 : 0), worst === null || priority(status) > priority(worst) ? status : worst];
 }
 
 /* ---------------------------------------------------------- incidents ---- */

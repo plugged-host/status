@@ -273,6 +273,11 @@ export class StatusMonitor extends DurableObject {
         };
         evaluate('site', evaluateEndpoint, site);
         evaluate('panel', evaluateEndpoint, panel);
+        /* 503 is the panel saying it is down on purpose (Laravel's `artisan down`, a planned
+           switch such as the move to v3): maintenance, not a miss. */
+        if (panel.http === 503) {
+            components.panel = { status: 'maintenance', failures: 0, healthy: 0, reachable: false, ms: panel.ms };
+        }
         targets.forEach((target, i) => evaluate(`node:${key(target.label)}`, evaluateNode, tcp[i]));
         state.components = components; // nodes no longer listed drop out
 
