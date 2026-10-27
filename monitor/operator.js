@@ -10,20 +10,9 @@
    HARDWARE: each node's processor and memory, used when the panel's export does not name them
    (Pelican's never did; v3's does from Admin › Nodes). */
 
-export const PLANNED = [
-    {
-        id: 'v3-2026-10-27',
-        title: 'Moving plugged.host to v3',
-        components: ['Panel'],
-        announced_at: '2026-10-27T11:30:00Z',
-        starts_at: '2026-10-27T16:52:00Z',
-        ends_at: '2026-10-27T18:00:00Z',
-        scheduled: 'The panel goes offline for about 10 minutes while we move plugged.host to v3. Game servers keep running; only the panel, SFTP and server starts pause.',
-        started: 'Maintenance has started: the panel is offline while we move plugged.host to v3. Game servers keep running.',
-        resolved: 'The maintenance is over and the panel is back.',
-        skipped: 'This maintenance did not take place. A new date will be announced.',
-    },
-];
+// Tonight's maintenance (2026-10-27) is the panel's own incident (Admin › Status), which the
+// release script updates; nothing planned here.
+export const PLANNED = [];
 
 export const HARDWARE = {
     de1: { cpu_model: 'EPYC 7351P', memory_type: 'DDR4' },
