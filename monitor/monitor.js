@@ -16,6 +16,7 @@
    of rows per tick to stay far inside the Workers Free plan's daily limits.
    Hostnames and ports never leave this object. */
 
+import { plannedIncidents } from './operator.js';
 import { DurableObject } from 'cloudflare:workers';
 import { connect } from 'cloudflare:sockets';
 import {
@@ -318,7 +319,11 @@ export class StatusMonitor extends DurableObject {
             panel: components.panel,
             nodes: new Map(targets.map(target => [key(target.label), components[`node:${key(target.label)}`]])),
         };
-        const incidentList = Array.isArray(incidents?.incidents) ? incidents.incidents : [];
+        /* the operator's planned maintenance first (monitor/operator.js), then the panel's */
+        const incidentList = [
+            ...plannedIncidents(now, panel, (state.planned ||= {})),
+            ...(Array.isArray(incidents?.incidents) ? incidents.incidents : []),
+        ];
         const currentOut = composeCurrent({
             now, panel: current, panelFresh, verdicts, targetLabels: targets.map(target => target.label), incidents: incidentList,
         });

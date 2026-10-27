@@ -51,6 +51,8 @@ const labels = {
 };
 
 const incidentStatusLabels = {
+    scheduled: 'Scheduled',
+    in_progress: 'In progress',
     investigating: 'Investigating',
     identified: 'Identified',
     monitoring: 'Monitoring',
@@ -381,9 +383,11 @@ function renderCurrent(data, history, incidentIndex) {
     /* Link to the incident list while any incident is open. */
     const flag = overall.querySelector('[data-overall-flag]');
     if (flag) {
-        const count = incidentIndex.active.length;
-        flag.hidden = count === 0;
-        flag.textContent = count > 0 ? plural(count, 'open incident') : '';
+        /* planned maintenance that has not begun is announced, not counted as an incident */
+        const open = incidentIndex.active.filter(i => i.status !== 'scheduled').length;
+        const planned = incidentIndex.active.length - open;
+        flag.hidden = open + planned === 0;
+        flag.textContent = open > 0 ? plural(open, 'open incident') : planned > 0 ? 'Maintenance scheduled' : '';
     }
 
     /* Node labels drive de-duplication: components[] also lists each node, so
@@ -501,7 +505,7 @@ function renderIncidents(data) {
             : '';
         return `<article class="incident${isActive ? ' is-active' : ''}"><header class="incident-head"><div>`
             + `<h3>${escapeHtml(incident.title)}</h3>`
-            + `<span class="incident-time">${escapeHtml(incident.started_at ? time(incident.started_at) : '')}`
+            + `<span class="incident-time">${incident.status === 'scheduled' ? 'Scheduled for ' : ''}${escapeHtml(incident.started_at ? time(incident.started_at) : '')}`
             + `${incident.resolved_at ? ` · resolved ${escapeHtml(time(incident.resolved_at))}` : ''}</span></div>`
             + `<span class="incident-badges">${liveBadge}`
             + `<span class="badge ${escapeHtml(incident.impact)}">${escapeHtml(incident.impact)}</span></span></header>`

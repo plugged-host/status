@@ -9,6 +9,8 @@
    Nothing composed here may carry a hostname or a port: node targets only
    contribute their label. */
 
+import { hardwareOf } from './operator.js';
+
 export const FRESH_MS = 180_000; // the pages' own staleness limit (STALE_AFTER)
 export const RECENT_MS = 60 * 60_000;
 export const HISTORY_DAYS = 90;
@@ -71,7 +73,8 @@ const IMPACT = { critical: 'major_outage', major: 'partial_outage', maintenance:
    impact, never lowers them. */
 export function applyIncidents(components, incidents) {
     for (const incident of Array.isArray(incidents) ? incidents : []) {
-        if (!incident || incident.status === 'resolved') continue;
+        /* resolved is over, scheduled has not begun */
+        if (!incident || incident.status === 'resolved' || incident.status === 'scheduled') continue;
         const raised = IMPACT[incident.impact] || 'degraded';
         const names = (Array.isArray(incident.components) && incident.components.length ? incident.components : ['All systems']).map(key);
         const all = names.includes('all systems');
@@ -177,7 +180,7 @@ export function composeCurrent({ now, panel, panelFresh, verdicts, targetLabels,
 
     if (panelFresh) {
         const reportedBy = Date.parse(panel.generated_at) - FRESH_MS;
-        nodes = panelNodes.map(node => ({ ...node, status: statusOf.get(key(node.label)) ?? node.status }));
+        nodes = panelNodes.map(node => ({ ...node, ...hardwareOf(node.label, node), status: statusOf.get(key(node.label)) ?? node.status }));
         global = {
             ...(panel.global || {}),
             /* The panel's rule (reported in the last 3 minutes and not
@@ -196,8 +199,7 @@ export function composeCurrent({ now, panel, panelFresh, verdicts, targetLabels,
                 latency_ms: verdict?.reachable && Number.isFinite(verdict.ms) ? verdict.ms : null,
                 metrics: null,
                 /* The hardware does not change while the panel is away. */
-                cpu_model: nodeOf.get(key(row.label))?.cpu_model ?? null,
-                memory_type: nodeOf.get(key(row.label))?.memory_type ?? null,
+                ...hardwareOf(row.label, nodeOf.get(key(row.label))),
             };
         });
         global = {
