@@ -3,7 +3,7 @@
 
    Compiled locally to the committed assets/status.v5.css (no host build step):
      export PATH="/root/.nvm/versions/node/v26.9.0/bin:$PATH"
-     cd /var/www/status && npm install && npm run build:css
+     cd /var/www/plugged.host/status && npm install && npm run build:css
 
    The CSP is style-src 'self' with no 'unsafe-inline', so nothing here or in
    status.v5.js may emit an inline <style> or a style="" attribute. Dynamic
