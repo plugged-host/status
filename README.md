@@ -1,7 +1,7 @@
 # plugged.host status
 
 The status page at [status.plugged.host](https://status.plugged.host), and the Cloudflare Worker
-that watches plugged.host from the outside, so the page keeps working when the panel is down.
+that watches plugged.host from the outside, so the page keeps working when the panel is down..
 
 ## How it works
 
